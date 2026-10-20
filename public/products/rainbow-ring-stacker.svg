@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Rainbow ring stacker">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF4E6"/><stop offset="1" stop-color="#FFE3EC"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0C48E"/><stop offset="1" stop-color="#C98B4F"/></linearGradient>
+    <linearGradient id="r1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF9A9A"/><stop offset="1" stop-color="#E85D75"/></linearGradient>
+    <linearGradient id="r2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFCB8A"/><stop offset="1" stop-color="#F59E42"/></linearGradient>
+    <linearGradient id="r3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFEA8F"/><stop offset="1" stop-color="#F2C230"/></linearGradient>
+    <linearGradient id="r4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A6E8B2"/><stop offset="1" stop-color="#4CBF7A"/></linearGradient>
+    <linearGradient id="r5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9ED9FF"/><stop offset="1" stop-color="#4A9EE8"/></linearGradient>
+    <linearGradient id="r6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D3B5FF"/><stop offset="1" stop-color="#8E6CE0"/></linearGradient>
+    <radialGradient id="top" cx="0.35" cy="0.35" r="0.7"><stop offset="0" stop-color="#FFD1E1"/><stop offset="1" stop-color="#F06C9B"/></radialGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <ellipse cx="200" cy="345" rx="120" ry="14" fill="#E8B9A6" opacity="0.5"/>
+  <rect x="192" y="110" width="16" height="210" rx="8" fill="url(#wood)"/>
+  <rect x="110" y="308" width="180" height="30" rx="15" fill="url(#wood)"/>
+  <g>
+    <rect x="115" y="274" width="170" height="36" rx="18" fill="url(#r1)"/>
+    <rect x="126" y="240" width="148" height="34" rx="17" fill="url(#r2)"/>
+    <rect x="137" y="208" width="126" height="32" rx="16" fill="url(#r3)"/>
+    <rect x="148" y="178" width="104" height="30" rx="15" fill="url(#r4)"/>
+    <rect x="158" y="150" width="84" height="28" rx="14" fill="url(#r5)"/>
+    <rect x="167" y="124" width="66" height="26" rx="13" fill="url(#r6)"/>
+  </g>
+  <g fill="#FFFFFF" opacity="0.35">
+    <rect x="135" y="279" width="70" height="7" rx="3.5"/>
+    <rect x="144" y="245" width="60" height="7" rx="3.5"/>
+    <rect x="153" y="213" width="50" height="6" rx="3"/>
+    <rect x="162" y="183" width="42" height="6" rx="3"/>
+    <rect x="170" y="155" width="34" height="5" rx="2.5"/>
+    <rect x="177" y="129" width="26" height="5" rx="2.5"/>
+  </g>
+  <circle cx="200" cy="100" r="26" fill="url(#top)"/>
+  <circle cx="191" cy="91" r="7" fill="#FFFFFF" opacity="0.6"/>
+</svg>

@@ -1,0 +1,1634 @@
+{
+  "sys": {
+    "type": "Array"
+  },
+  "total": 12,
+  "skip": 0,
+  "limit": 100,
+  "items": [
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "1mr9Qwbpgdc7bakv6JfGwI",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.412Z",
+        "updatedAt": "2026-10-20T02:09:21.412Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Bubble Bath Whale",
+        "slug": "bubble-bath-whale",
+        "visibility": "public",
+        "category": "bath",
+        "description": "A friendly blue whale that scoops up bath water and sprinkles it from its blowhole. Floats upright for splashy tub-time fun.",
+        "priceLoggedOut": 14,
+        "priceAuthenticated": 11.2,
+        "ageRange": "6 months+",
+        "material": "BPA-free vinyl",
+        "features": [
+          "Blowhole water spout",
+          "Scoops and pours",
+          "Floats upright"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "2EUhZptoIxVcTXRY6b9iEn",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.300Z",
+        "updatedAt": "2026-10-20T02:09:21.300Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Cloud Bunny Plush",
+        "slug": "cloud-bunny-plush",
+        "visibility": "public",
+        "category": "plush",
+        "description": "A sleepy bunny with a squishy cloud body and long pink-lined ears. Embroidered features make it a safe first cuddle buddy from day one.",
+        "priceLoggedOut": 28,
+        "priceAuthenticated": 22.4,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "6v3ZZNwA5ti2Abjmqtrmh9",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.174Z",
+            "updatedAt": "2026-10-20T02:07:38.174Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Cloud Bunny Plush",
+            "description": "Smiling bunny plush with a fluffy cloud body",
+            "file": {
+              "url": "/products/cloud-bunny-plush.svg",
+              "details": {
+                "size": 2144,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "cloud-bunny-plush.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "0 months+",
+        "material": "Organic cotton, polyester fill",
+        "features": [
+          "GOTS-certified organic cotton",
+          "Embroidered eyes, no small parts",
+          "Machine washable",
+          "Ultra-soft cloud body"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "5BFeYzgKuQOBl02Pm1tSmA",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.464Z",
+        "updatedAt": "2026-10-20T02:09:21.464Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Forest Friends Activity Cube",
+        "slug": "forest-friends-activity-cube",
+        "visibility": "authenticated",
+        "category": "activity-sensory",
+        "description": "A members-only, heirloom-quality activity center with a bead maze on top and gears, spinners and shape slides on every side.",
+        "priceLoggedOut": 89,
+        "priceAuthenticated": 71.2,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "4NdAc8klVKcnCOd6jXBCSv",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.178Z",
+            "updatedAt": "2026-10-20T02:07:38.178Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Forest Friends Activity Cube",
+            "description": "Activity cube with a bead maze on top, a forest tree side and gear side",
+            "file": {
+              "url": "/products/forest-friends-activity-cube.svg",
+              "details": {
+                "size": 2227,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "forest-friends-activity-cube.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "12 months+",
+        "material": "Birch plywood, non-toxic finish",
+        "features": [
+          "Bead maze top",
+          "Five activity sides",
+          "Gears, spinners and shape slides",
+          "Heirloom quality"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "1g1mRdbFB04sovvbtaliyk",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:23.558Z",
+        "updatedAt": "2026-10-20T02:09:23.558Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Heirloom Wooden Xylophone",
+        "slug": "heirloom-wooden-xylophone",
+        "visibility": "authenticated",
+        "category": "musical",
+        "description": "A members-only xylophone with eight tuned, color-coded maple bars on a walnut frame. Comes with two rounded mallets sized for small hands.",
+        "priceLoggedOut": 54,
+        "priceAuthenticated": 43.2,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "3fiZrOiHZBAQyd10Nj577L",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.180Z",
+            "updatedAt": "2026-10-20T02:07:38.180Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Heirloom Wooden Xylophone",
+            "description": "Eight-bar rainbow xylophone on a wooden frame with two mallets",
+            "file": {
+              "url": "/products/heirloom-wooden-xylophone.svg",
+              "details": {
+                "size": 2830,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "heirloom-wooden-xylophone.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "18 months+",
+        "material": "Maple bars, walnut frame",
+        "features": [
+          "Eight tuned bars",
+          "Two rounded mallets",
+          "Color-coded notes"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "1E9A3BFPJvN1gIL4eXDzwx",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.383Z",
+        "updatedAt": "2026-10-20T02:09:21.383Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Jingle Ball Trio",
+        "slug": "jingle-ball-trio",
+        "visibility": "public",
+        "category": "musical",
+        "description": "Three soft, textured balls with a gentle jingle inside. Easy to grab, squeeze and roll, encouraging reaching and crawling.",
+        "priceLoggedOut": 16,
+        "priceAuthenticated": 12.8,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "5gHNrhr9OyzJZ4IWr4mrCC",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.177Z",
+            "updatedAt": "2026-10-20T02:07:38.177Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Jingle Ball Trio",
+            "description": "Three soft jingle balls in pink, yellow and mint with music notes",
+            "file": {
+              "url": "/products/jingle-ball-trio.svg",
+              "details": {
+                "size": 2042,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "jingle-ball-trio.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "3 months+",
+        "material": "Soft fabric, enclosed bells",
+        "features": [
+          "Set of three textured balls",
+          "Gentle jingle inside",
+          "Easy to grab and roll"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "1TGQif4Jh4WHAHXjHvRAeo",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.437Z",
+        "updatedAt": "2026-10-20T02:09:21.437Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Moonbeam Musical Mobile",
+        "slug": "moonbeam-musical-mobile",
+        "visibility": "authenticated",
+        "category": "musical",
+        "description": "A members-only crib mobile with a hand-felted moon, star and cloud that turn slowly to six soft lullabies. Auto-off timer for peaceful nights.",
+        "priceLoggedOut": 68,
+        "priceAuthenticated": 54.4,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "11SmwgVJi5tPUexrMEj1Dn",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.178Z",
+            "updatedAt": "2026-10-20T02:07:38.178Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Moonbeam Musical Mobile",
+            "description": "Crib mobile with a crescent moon, star and cloud on a night-sky background",
+            "file": {
+              "url": "/products/moonbeam-musical-mobile.svg",
+              "details": {
+                "size": 2388,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "moonbeam-musical-mobile.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "0–5 months",
+        "material": "Wool felt, beech wood arm",
+        "features": [
+          "Plays six soft lullabies",
+          "Slow rotation with auto-off timer",
+          "Fits most cribs",
+          "Hand-felted figures"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "N9c3tvUHbEdJ1qcUYtCrT",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.244Z",
+        "updatedAt": "2026-10-20T02:09:21.244Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Ocean Wave Rattle",
+        "slug": "ocean-wave-rattle",
+        "visibility": "public",
+        "category": "rattles-teethers",
+        "description": "A clear, wave-patterned rattle filled with gently tumbling beads, with a soft silicone ring handle that doubles as a teether.",
+        "priceLoggedOut": 12,
+        "priceAuthenticated": 9.6,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "6B3wwtqZz7f3erkqs3OtKG",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.171Z",
+            "updatedAt": "2026-10-20T02:07:38.171Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Ocean Wave Rattle",
+            "description": "Round rattle with an ocean wave pattern and a teething ring handle",
+            "file": {
+              "url": "/products/ocean-wave-rattle.svg",
+              "details": {
+                "size": 1806,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "ocean-wave-rattle.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "0–12 months",
+        "material": "BPA-free plastic, food-grade silicone",
+        "features": [
+          "Gentle bead rattle sound",
+          "Silicone teething ring handle",
+          "Easy grip for tiny hands",
+          "Dishwasher safe"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "41GedmhAAS0NVV4L1f3yvQ",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.199Z",
+        "updatedAt": "2026-10-20T02:09:21.199Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Rainbow Ring Stacker",
+        "slug": "rainbow-ring-stacker",
+        "visibility": "public",
+        "category": "stacking-sorting",
+        "description": "A classic stacker with six pastel rings that slide onto a smooth wooden peg. Helps little hands practice grasping, size sequencing and early color recognition.",
+        "priceLoggedOut": 24,
+        "priceAuthenticated": 19.2,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "4Nnju14v3KRISXx2ODs8hr",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.169Z",
+            "updatedAt": "2026-10-20T02:07:38.169Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Rainbow Ring Stacker",
+            "description": "Rainbow ring stacker with six pastel rings on a wooden base",
+            "file": {
+              "url": "/products/rainbow-ring-stacker.svg",
+              "details": {
+                "size": 2762,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "rainbow-ring-stacker.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "6–24 months",
+        "material": "FSC-certified beech wood, water-based paint",
+        "features": [
+          "Six graduated rings",
+          "Rounded, splinter-free edges",
+          "Teaches size sequencing",
+          "Non-toxic finish"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "43hLVM9NcyWm7oqpURDXW7",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:23.606Z",
+        "updatedAt": "2026-10-20T02:09:23.606Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Sensory Crinkle Book Set",
+        "slug": "sensory-crinkle-book-set",
+        "visibility": "authenticated",
+        "category": "activity-sensory",
+        "description": "A members-only set of three soft books with crinkle pages, ribbon tags and high-contrast illustrations that engage developing senses.",
+        "priceLoggedOut": 36,
+        "priceAuthenticated": 28.8,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "IF0FbwlOSUeIKwJMOU9wo",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:40.274Z",
+            "updatedAt": "2026-10-20T02:07:40.274Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Sensory Crinkle Book Set",
+            "description": "Three soft crinkle books with ribbon tags and heart and sun covers",
+            "file": {
+              "url": "/products/sensory-crinkle-book-set.svg",
+              "details": {
+                "size": 2517,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "sensory-crinkle-book-set.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "0 months+",
+        "material": "Soft cotton, crinkle inserts",
+        "features": [
+          "Set of three books",
+          "Crinkle pages and ribbon tags",
+          "High-contrast illustrations",
+          "Machine washable"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "1dxR4QUfuL5Ca4pQGPM0ae",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.356Z",
+        "updatedAt": "2026-10-20T02:09:21.356Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Shape Sorter Cube",
+        "slug": "shape-sorter-cube",
+        "visibility": "public",
+        "category": "stacking-sorting",
+        "description": "A sturdy wooden cube with circle, triangle and square cutouts. Matching shapes to holes builds problem solving and fine motor skills.",
+        "priceLoggedOut": 32,
+        "priceAuthenticated": 25.6,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "1VxwCdHR3LsZaZ0gjagiPC",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.175Z",
+            "updatedAt": "2026-10-20T02:07:38.175Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Shape Sorter Cube",
+            "description": "Wooden shape sorter cube with circle, triangle and square cutouts",
+            "file": {
+              "url": "/products/shape-sorter-cube.svg",
+              "details": {
+                "size": 1748,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "shape-sorter-cube.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "12–36 months",
+        "material": "Solid wood, water-based paint",
+        "features": [
+          "Three shape cutouts",
+          "Lift-off lid for easy retrieval",
+          "Builds problem solving"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "5yAUf5kbmExBmNdZAnxmDA",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.327Z",
+        "updatedAt": "2026-10-20T02:09:21.327Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Starlight Teether Ring",
+        "slug": "starlight-teether-ring",
+        "visibility": "public",
+        "category": "rattles-teethers",
+        "description": "A star-shaped teether with soft textured nubs to soothe sore gums. Pop it in the freezer for extra cooling relief.",
+        "priceLoggedOut": 11,
+        "priceAuthenticated": 8.8,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "5Oq1jEHnyTGATUtmMmZfdv",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.175Z",
+            "updatedAt": "2026-10-20T02:07:38.175Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Starlight Teether Ring",
+            "description": "Lavender star-shaped silicone teether with a center ring",
+            "file": {
+              "url": "/products/starlight-teether-ring.svg",
+              "details": {
+                "size": 1502,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "starlight-teether-ring.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "3 months+",
+        "material": "100% food-grade silicone",
+        "features": [
+          "Textured nubs soothe gums",
+          "Freezer safe",
+          "One-piece design"
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "tags": [],
+        "concepts": []
+      },
+      "sys": {
+        "space": {
+          "sys": {
+            "type": "Link",
+            "linkType": "Space",
+            "id": "5bhwks3skt9x"
+          }
+        },
+        "id": "1abTUCfDkangVcCe1QtHcW",
+        "type": "Entry",
+        "createdAt": "2026-10-20T02:09:21.272Z",
+        "updatedAt": "2026-10-20T02:09:21.272Z",
+        "environment": {
+          "sys": {
+            "id": "master",
+            "type": "Link",
+            "linkType": "Environment"
+          }
+        },
+        "publishedVersion": 1,
+        "revision": 1,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "product"
+          }
+        },
+        "locale": "en-US"
+      },
+      "fields": {
+        "name": "Sunny Duck Bath Squirter",
+        "slug": "sunny-duck-bath-squirter",
+        "visibility": "public",
+        "category": "bath",
+        "description": "A cheerful yellow duck that floats, bobs and squirts. Its sealed body keeps water (and mold) out, so bath time stays fun and clean.",
+        "priceLoggedOut": 9,
+        "priceAuthenticated": 7.2,
+        "image": {
+          "metadata": {
+            "tags": [],
+            "concepts": []
+          },
+          "sys": {
+            "space": {
+              "sys": {
+                "type": "Link",
+                "linkType": "Space",
+                "id": "5bhwks3skt9x"
+              }
+            },
+            "id": "nZeuHpAeCTiFE6roUEZWV",
+            "type": "Asset",
+            "createdAt": "2026-10-20T02:07:38.173Z",
+            "updatedAt": "2026-10-20T02:07:38.173Z",
+            "environment": {
+              "sys": {
+                "id": "master",
+                "type": "Link",
+                "linkType": "Environment"
+              }
+            },
+            "publishedVersion": 2,
+            "revision": 1,
+            "locale": "en-US"
+          },
+          "fields": {
+            "title": "Sunny Duck Bath Squirter",
+            "description": "Yellow rubber duck floating on water with droplets",
+            "file": {
+              "url": "/products/sunny-duck-bath-squirter.svg",
+              "details": {
+                "size": 1833,
+                "image": {
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              "fileName": "sunny-duck-bath-squirter.svg",
+              "contentType": "image/svg+xml"
+            }
+          }
+        },
+        "ageRange": "6 months+",
+        "material": "Sealed, mold-resistant silicone",
+        "features": [
+          "Sealed, no mold inside",
+          "Floats and squirts",
+          "Soft, squeezable body"
+        ]
+      }
+    }
+  ],
+  "includes": {
+    "Asset": [
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "11SmwgVJi5tPUexrMEj1Dn",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.178Z",
+          "updatedAt": "2026-10-20T02:07:38.178Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Moonbeam Musical Mobile",
+          "description": "Crib mobile with a crescent moon, star and cloud on a night-sky background",
+          "file": {
+            "url": "/products/moonbeam-musical-mobile.svg",
+            "details": {
+              "size": 2388,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "moonbeam-musical-mobile.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "1VxwCdHR3LsZaZ0gjagiPC",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.175Z",
+          "updatedAt": "2026-10-20T02:07:38.175Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Shape Sorter Cube",
+          "description": "Wooden shape sorter cube with circle, triangle and square cutouts",
+          "file": {
+            "url": "/products/shape-sorter-cube.svg",
+            "details": {
+              "size": 1748,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "shape-sorter-cube.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "3fiZrOiHZBAQyd10Nj577L",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.180Z",
+          "updatedAt": "2026-10-20T02:07:38.180Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Heirloom Wooden Xylophone",
+          "description": "Eight-bar rainbow xylophone on a wooden frame with two mallets",
+          "file": {
+            "url": "/products/heirloom-wooden-xylophone.svg",
+            "details": {
+              "size": 2830,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "heirloom-wooden-xylophone.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "4NdAc8klVKcnCOd6jXBCSv",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.178Z",
+          "updatedAt": "2026-10-20T02:07:38.178Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Forest Friends Activity Cube",
+          "description": "Activity cube with a bead maze on top, a forest tree side and gear side",
+          "file": {
+            "url": "/products/forest-friends-activity-cube.svg",
+            "details": {
+              "size": 2227,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "forest-friends-activity-cube.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "4Nnju14v3KRISXx2ODs8hr",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.169Z",
+          "updatedAt": "2026-10-20T02:07:38.169Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Rainbow Ring Stacker",
+          "description": "Rainbow ring stacker with six pastel rings on a wooden base",
+          "file": {
+            "url": "/products/rainbow-ring-stacker.svg",
+            "details": {
+              "size": 2762,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "rainbow-ring-stacker.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "5Oq1jEHnyTGATUtmMmZfdv",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.175Z",
+          "updatedAt": "2026-10-20T02:07:38.175Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Starlight Teether Ring",
+          "description": "Lavender star-shaped silicone teether with a center ring",
+          "file": {
+            "url": "/products/starlight-teether-ring.svg",
+            "details": {
+              "size": 1502,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "starlight-teether-ring.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "5gHNrhr9OyzJZ4IWr4mrCC",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.177Z",
+          "updatedAt": "2026-10-20T02:07:38.177Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Jingle Ball Trio",
+          "description": "Three soft jingle balls in pink, yellow and mint with music notes",
+          "file": {
+            "url": "/products/jingle-ball-trio.svg",
+            "details": {
+              "size": 2042,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "jingle-ball-trio.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "6B3wwtqZz7f3erkqs3OtKG",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.171Z",
+          "updatedAt": "2026-10-20T02:07:38.171Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Ocean Wave Rattle",
+          "description": "Round rattle with an ocean wave pattern and a teething ring handle",
+          "file": {
+            "url": "/products/ocean-wave-rattle.svg",
+            "details": {
+              "size": 1806,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "ocean-wave-rattle.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "6v3ZZNwA5ti2Abjmqtrmh9",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.174Z",
+          "updatedAt": "2026-10-20T02:07:38.174Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Cloud Bunny Plush",
+          "description": "Smiling bunny plush with a fluffy cloud body",
+          "file": {
+            "url": "/products/cloud-bunny-plush.svg",
+            "details": {
+              "size": 2144,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "cloud-bunny-plush.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "IF0FbwlOSUeIKwJMOU9wo",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:40.274Z",
+          "updatedAt": "2026-10-20T02:07:40.274Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Sensory Crinkle Book Set",
+          "description": "Three soft crinkle books with ribbon tags and heart and sun covers",
+          "file": {
+            "url": "/products/sensory-crinkle-book-set.svg",
+            "details": {
+              "size": 2517,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "sensory-crinkle-book-set.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      },
+      {
+        "metadata": {
+          "tags": [],
+          "concepts": []
+        },
+        "sys": {
+          "space": {
+            "sys": {
+              "type": "Link",
+              "linkType": "Space",
+              "id": "5bhwks3skt9x"
+            }
+          },
+          "id": "nZeuHpAeCTiFE6roUEZWV",
+          "type": "Asset",
+          "createdAt": "2026-10-20T02:07:38.173Z",
+          "updatedAt": "2026-10-20T02:07:38.173Z",
+          "environment": {
+            "sys": {
+              "id": "master",
+              "type": "Link",
+              "linkType": "Environment"
+            }
+          },
+          "publishedVersion": 2,
+          "revision": 1,
+          "locale": "en-US"
+        },
+        "fields": {
+          "title": "Sunny Duck Bath Squirter",
+          "description": "Yellow rubber duck floating on water with droplets",
+          "file": {
+            "url": "/products/sunny-duck-bath-squirter.svg",
+            "details": {
+              "size": 1833,
+              "image": {
+                "width": 400,
+                "height": 400
+              }
+            },
+            "fileName": "sunny-duck-bath-squirter.svg",
+            "contentType": "image/svg+xml"
+          }
+        }
+      }
+    ]
+  }
+}

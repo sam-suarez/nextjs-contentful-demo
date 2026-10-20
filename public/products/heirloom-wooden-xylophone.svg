@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Heirloom wooden xylophone">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF5E8"/><stop offset="1" stop-color="#F2ECFF"/></linearGradient>
+    <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9A56A"/><stop offset="1" stop-color="#A86F3A"/></linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.45"/><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <ellipse cx="200" cy="335" rx="150" ry="14" fill="#DCC8B0" opacity="0.6"/>
+  <polygon points="58,112 342,158 342,174 58,128" fill="url(#rail)"/>
+  <polygon points="58,288 342,248 342,264 58,304" fill="url(#rail)"/>
+  <g>
+    <rect x="70" y="100" width="28" height="210" rx="7" fill="#F26D7D"/>
+    <rect x="104" y="108" width="28" height="196" rx="7" fill="#F79A5B"/>
+    <rect x="138" y="116" width="28" height="182" rx="7" fill="#F7C948"/>
+    <rect x="172" y="124" width="28" height="168" rx="7" fill="#7FD48E"/>
+    <rect x="206" y="132" width="28" height="154" rx="7" fill="#4FC3C9"/>
+    <rect x="240" y="140" width="28" height="140" rx="7" fill="#5B9BE8"/>
+    <rect x="274" y="148" width="28" height="126" rx="7" fill="#8E6CE0"/>
+    <rect x="308" y="156" width="28" height="112" rx="7" fill="#E07BC8"/>
+  </g>
+  <g fill="url(#sheen)">
+    <rect x="70" y="100" width="28" height="210" rx="7"/><rect x="104" y="108" width="28" height="196" rx="7"/>
+    <rect x="138" y="116" width="28" height="182" rx="7"/><rect x="172" y="124" width="28" height="168" rx="7"/>
+    <rect x="206" y="132" width="28" height="154" rx="7"/><rect x="240" y="140" width="28" height="140" rx="7"/>
+    <rect x="274" y="148" width="28" height="126" rx="7"/><rect x="308" y="156" width="28" height="112" rx="7"/>
+  </g>
+  <g fill="#F2E3CC">
+    <circle cx="84" cy="122" r="4"/><circle cx="118" cy="128" r="4"/><circle cx="152" cy="133" r="4"/><circle cx="186" cy="139" r="4"/>
+    <circle cx="220" cy="144" r="4"/><circle cx="254" cy="150" r="4"/><circle cx="288" cy="155" r="4"/><circle cx="322" cy="161" r="4"/>
+    <circle cx="84" cy="292" r="4"/><circle cx="118" cy="287" r="4"/><circle cx="152" cy="282" r="4"/><circle cx="186" cy="277" r="4"/>
+    <circle cx="220" cy="272" r="4"/><circle cx="254" cy="268" r="4"/><circle cx="288" cy="263" r="4"/><circle cx="322" cy="258" r="4"/>
+  </g>
+  <g stroke="#C99A62" stroke-width="7" stroke-linecap="round">
+    <line x1="150" y1="370" x2="230" y2="318"/><line x1="250" y1="372" x2="180" y2="318"/>
+  </g>
+  <circle cx="234" cy="315" r="13" fill="#F26D7D"/><circle cx="176" cy="315" r="13" fill="#5B9BE8"/>
+</svg>

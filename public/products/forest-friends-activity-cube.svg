@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Forest friends activity cube">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E8F5E4"/><stop offset="1" stop-color="#FFF4DD"/></linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7DDB0"/><stop offset="1" stop-color="#E8BE80"/></linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FD8A8"/><stop offset="1" stop-color="#5DB377"/></linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8CC8E8"/><stop offset="1" stop-color="#4E95C4"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <ellipse cx="200" cy="358" rx="140" ry="14" fill="#C9D6B8" opacity="0.6"/>
+  <polygon points="200,150 320,210 200,270 80,210" fill="url(#top)"/>
+  <polygon points="80,210 200,270 200,345 80,285" fill="url(#left)"/>
+  <polygon points="200,270 320,210 320,285 200,345" fill="url(#right)"/>
+  <g fill="none" stroke-width="6" stroke-linecap="round">
+    <path d="M120 205 A40 70 0 0 1 200 205" stroke="#F06C9B"/>
+    <path d="M160 225 A45 85 0 0 1 250 225" stroke="#F7BD2C"/>
+    <path d="M150 200 A65 60 0 0 1 280 200" stroke="#8E6CE0"/>
+  </g>
+  <circle cx="125.4" cy="170" r="12" fill="#FF9DB5"/><circle cx="180" cy="144.4" r="12" fill="#6EC6FF"/>
+  <circle cx="182.5" cy="151.4" r="12" fill="#FFD36E"/><circle cx="236.8" cy="164.9" r="12" fill="#8EDB9F"/>
+  <circle cx="203.7" cy="140.9" r="12" fill="#C9A7FF"/><circle cx="271.3" cy="170" r="12" fill="#FFB067"/>
+  <rect x="135" y="270" width="8" height="30" fill="#8A5A2E" transform="skewY(26.6) translate(0 -70)"/>
+  <polygon points="112,238 140,252 168,266 140,214" fill="#2F8F55" transform="translate(0 6)"/>
+  <polygon points="118,262 140,273 162,284 140,240" fill="#2F8F55" transform="translate(0 6)"/>
+  <circle cx="250" cy="285" r="18" fill="none" stroke="#FFFFFF" stroke-width="6" opacity="0.8"/>
+  <circle cx="290" cy="262" r="12" fill="none" stroke="#FFFFFF" stroke-width="5" opacity="0.8"/>
+  <circle cx="250" cy="285" r="5" fill="#FFFFFF" opacity="0.8"/>
+</svg>

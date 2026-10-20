@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Shape sorter cube">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF6E5"/><stop offset="1" stop-color="#E8F6EC"/></linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FAD9A8"/><stop offset="1" stop-color="#EDBB7A"/></linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3A866"/><stop offset="1" stop-color="#C98B4F"/></linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4975A"/><stop offset="1" stop-color="#B07440"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <ellipse cx="200" cy="350" rx="135" ry="14" fill="#D9C7A8" opacity="0.55"/>
+  <polygon points="200,80 320,140 200,200 80,140" fill="url(#top)"/>
+  <polygon points="80,140 200,200 200,335 80,275" fill="url(#left)"/>
+  <polygon points="200,200 320,140 320,275 200,335" fill="url(#right)"/>
+  <ellipse cx="200" cy="140" rx="30" ry="15" fill="#8A5A2E"/>
+  <polygon points="140,215 165,265 115,253" fill="#8A5A2E"/>
+  <polygon points="240,240 285,218 285,258 240,280" fill="#8A5A2E"/>
+  <circle cx="335" cy="320" r="24" fill="#FF8FA3"/>
+  <circle cx="328" cy="312" r="6" fill="#FFFFFF" opacity="0.5"/>
+  <polygon points="58,330 82,290 106,330" fill="#6EC6FF" stroke="#6EC6FF" stroke-width="6" stroke-linejoin="round"/>
+  <rect x="262" y="40" width="42" height="42" rx="6" fill="#8EDB9F" transform="rotate(15 283 61)"/>
+  <polygon points="200,80 320,140 200,200 80,140" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.5" stroke-linejoin="round"/>
+</svg>
