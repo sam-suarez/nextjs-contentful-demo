@@ -1,8 +1,7 @@
 # Progress
 
-**Current part:** 3 — Architecture and conventions: **complete**
-**Next part:** 4 — Agent system design
-**Previous parts:** 1 — Repo and tooling; 2 — Data model and Contentful
+**Current part:** 4 — Agent system design: **complete**
+**Previous parts:** 1 — Repo and tooling; 2 — Data model and Contentful; 3 — Architecture and conventions
 
 ## Done in Part 1
 - `docs/assessment-summary.md` written (never re-read the PDF from now on)
@@ -31,22 +30,40 @@
 - D-013 item done: path-scoped rules in `.claude/rules/` (ssr-rendering, client-islands, server-lib, tests)
 - Vitest `server-only` alias (verified with a throwaway lib test)
 
+## Done in Part 4
+- D-023: 5-role roster. Orchestrator = main session (subagents can't start subagents); data-auth / ui / qa own paths matching the `.claude/rules/` globs; reviewer read-only
+- D-024: file handoffs in `handoffs/phase-NN/` (spec, qa, build, review) + orchestrator-only `STATE.md`; reviewer sees spec + diff only; REVISE max 2 rounds, then escalate
+- D-025: qa writes failing tests from the spec before the build; builders can't edit tests
+- D-026: layered 6-phase plan (P01 auth core, P02 data layer: data-auth; P03 catalog, P04 detail + login, P05 layout toggle: ui; P06 release check: qa). `handoffs/STATE.md`. Each phase ends at a human gate: commit + `human-check.md` (manual verification steps + paste-ready prompt for the next thread), one phase per thread
+- D-027: shared agent template (`agents/_template.md`); wrappers = frontmatter + "follow /agents/X.md"; reviewer tools `Read, Grep` only, gets `diff.patch` from the orchestrator; builders' hands off tests enforced by `shasum` lock (verified: detects an edited test and a new test file)
+- Written: `agents/{_template,orchestrator,data-auth,ui,qa,reviewer}.md`, `.claude/agents/{data-auth,ui,qa,reviewer}.md`, `handoffs/_templates/{spec,qa,build,review,human-check}.md`, seeded `handoffs/STATE.md`
+- architecture.md: empty `CONTENTFUL_*` = unset, cookie name `session`, `SESSION_SECRET` ≥ 32 chars, SVG images via `next/image unoptimized` + remotePatterns, SSR checks blank the env vars and assert both directions + no streaming wrapper
+- Ownership gaps closed: `next.config.ts` → ui, `.env.example` → data-auth, `package.json` only via spec
+- D-028: `docs/design.md` written (user-described UI with example screens, references and design patterns): tokens, components, page shell, wireframes + exact copy for catalog (both layouts, empty state), detail, login, 404; responsive + a11y; phase mapping. architecture.md, STATE.md phase notes and the ui / reviewer / orchestrator agent files now point to it
+- Brand placeholder "Tiny Confetti" (one place to rename: `docs/design.md` Direction)
+- D-029: hooks registered in `.claude/settings.json`, scripts in `.claude/hooks/`, role taken from `agent_type`: `guard-paths.mjs` (owned-path writes, never-open reads, reviewer read allowlist), `typecheck-after-edit.mjs` (advisory, never blocks, since pre-build typecheck fails on purpose), `stop-gate.mjs` (data-auth/ui: typecheck + `npm test` + `verify-ssr.sh` once it exists; blocks once, then lets the builder escalate). `/phase` skill starts the orchestrator and registers its guard. Agent files, wrappers and the human-check template mention the hooks
+- Verified: 39 synthetic guard cases, typecheck hook + stop gate on a clean and a broken tree, and a live fresh headless session (reviewer read blocked, data-auth out-of-path write blocked, ui stop gate fired then let through). Subagent-frontmatter hooks (first attempt) never fired: they need the workspace trust dialog accepted; settings.json and skill hooks don't
+- Human check (Part 4 files: agents, handoff templates, design.md, hooks): PASSED 2026-10-20
+- D-030: `AGENTS.md` (Next-managed, loaded by every agent) and `AGENT.md` (deliverable, written after P06) co-exist
+
 ## Notes carried forward
 - Fetch-layer details now live in `docs/architecture.md` (Data access)
-- Images are SVG: `next/image` needs `unoptimized` (or `dangerouslyAllowSVG`), and `images.ctfassets.net` in `remotePatterns`. Not yet in architecture.md; decide when the card component is specified
+- Next loads `.env.local` itself but won't overwrite a var already in the environment (checked in `@next/env`), so checks force mock mode by exporting the `CONTENTFUL_*` vars as empty strings
+- Pre-build, `npm run typecheck` fails on qa's tests (imports of modules not built yet). Handled in D-029: per-edit typecheck only advises; the builder stop gate is where it must pass
 
 ## Next step
-- Part 4, first decision: agent roster and handoff model (how many agents, who owns which paths, file-based handoffs). Builds the D-013 Reviewer agent
+- Part 5 = Phase 01 (auth core, builder data-auth): new thread at the repo root, run `/phase` (first phase, no previous human check)
 
 ## User-required patterns (D-013), build when their part arrives
 - ~~Part 3: path-scoped rules~~ done (`.claude/rules/`)
-- Agent-design part: context-blind, read-only Reviewer agent (spec + diff only → PASS/REVISE/BLOCK per requirement)
-- Pipeline setup / before the first dry run: hooks running typecheck + `scripts/verify-ssr.sh` after edits; SSR checks must assert both directions (Set B present when logged in, absent when logged out) AND that prices are not inside a `<div hidden>` streaming wrapper / no Suspense fallback text in the body (D-020 probe: curl+grep alone passes on streamed content)
+- ~~Agent-design part: context-blind, read-only Reviewer agent~~ done (`agents/reviewer.md`, tools `Read, Grep`)
+- ~~Pipeline setup / before the first dry run~~ done (D-029, `.claude/hooks/`): hooks running typecheck + `scripts/verify-ssr.sh` after edits; SSR checks must assert both directions (Set B present when logged in, absent when logged out) AND that prices are not inside a `<div hidden>` streaming wrapper / no Suspense fallback text in the body (D-020 probe: curl+grep alone passes on streamed content)
 - Part 5 onward: every handoff ends with "where the instructions got in the way", feeding `docs/intervention-log.md` and AGENT.md
 
 ## Open questions
-- Naming: the scaffold's `AGENTS.md` (Next.js auto-managed rules) vs the deliverable `AGENT.md`. Decide on co-existence or merging when AGENT.md is written.
-- Playwright config + browser install are deferred until e2e tests exist.
+- Playwright config + browser install are deferred until e2e tests exist (qa, P04).
+- Does Claude Code apply `.claude/rules/` path rules inside subagents? Agent files tell builders to read their rules explicitly either way; confirm during the P01 dry run.
+- Interactive sessions: if a phase thread shows hooks not firing (a builder writes outside its paths unblocked), check the workspace trust prompt first.
 
 ## Blockers
 - None
