@@ -2,6 +2,7 @@
 # SSR checks for the catalog (P03: R7, R13, R15-R23). Later phases extend this file.
 # P04 additions: product detail (R1-R11), login (R12-R15) and route-level not-found (R2, R16).
 # P05 additions: layout toggle island (P05 R3, R5, R6; R14 via the R18 loop).
+# P04-fix1 additions: proxy 307 for members-only slugs (R4, R10) and the slug-cache log (R11).
 #
 # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
 # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
@@ -78,6 +79,22 @@ header_val() {
   { grep -i "^$name:" "$file.headers" || true; } | tail -n1 | sed -E 's/^[^:]+:[[:space:]]*//' | tr -d '\r\n'
 }
 location_is() { [ "$(header_val "$1" "Location")" = "$2" ]; }
+
+# P04-fix1 R4 rule: the Location, resolved against the request URL, is on the request origin,
+# has pathname /login and exactly one search param, next, whose decoded value is EXPECTED_NEXT.
+# Usage: login_redirect_to FILE REQUEST_PATH EXPECTED_NEXT (either encoding of next passes).
+cat >"$WORK/login-redirect.mjs" <<'JS'
+const [location, requestUrl, expectedNext] = process.argv.slice(2);
+if (!location) process.exit(1);
+const target = new URL(location, requestUrl);
+const ok =
+  target.origin === new URL(requestUrl).origin &&
+  target.pathname === "/login" &&
+  [...target.searchParams.keys()].join(",") === "next" &&
+  target.searchParams.get("next") === expectedNext;
+process.exit(ok ? 0 : 1);
+JS
+login_redirect_to() { node "$WORK/login-redirect.mjs" "$(header_val "$1" "Location")" "$BASE$2" "$3"; }
 
 # Whole-tag lookup, attributes in any order, values compared in their
 # HTML-escaped form. Usage: tag_count FILE TAG|* name=value ...
@@ -265,6 +282,18 @@ process.stdout.write(token);
 ')"
 GOOD_COOKIE="session=$TOKEN"
 BAD_COOKIE="session=not-a-jwt"
+# P04-fix1 R4: more cookies that carry no valid session.
+EXPIRED_TOKEN="$(node --input-type=module -e '
+import { SignJWT } from "jose";
+const secret = new TextEncoder().encode(process.env.SESSION_SECRET);
+const token = await new SignJWT({ name: "ssr-checker" })
+  .setProtectedHeader({ alg: "HS256" })
+  .setExpirationTime(Math.floor(Date.now() / 1000) - 60)
+  .sign(secret);
+process.stdout.write(token);
+')"
+EXPIRED_COOKIE="session=$EXPIRED_TOKEN"
+OTHER_NAME_COOKIE="not-session=$TOKEN"
 
 # --- Fetch ------------------------------------------------------------------
 fetch_page anon "/"
@@ -297,6 +326,14 @@ fetch_page detail_ffac_member "/products/forest-friends-activity-cube" "$GOOD_CO
 fetch_page detail_bbw_anon "/products/bubble-bath-whale"
 fetch_page detail_unknown "/products/no-such-toy"
 fetch_page detail_badslug "/products/Not-Valid-Slug"
+# P04-fix1: more logged-out (or invalid-session) Set B requests. With detail_ffac_anon above,
+# that is 7 requests for Set B slugs without a valid session (R11 needs at least 3).
+fetch_page detail_ffac_badcookie "/products/forest-friends-activity-cube" "$BAD_COOKIE"
+fetch_page detail_ffac_expired "/products/forest-friends-activity-cube" "$EXPIRED_COOKIE"
+fetch_page detail_ffac_othername "/products/forest-friends-activity-cube" "$OTHER_NAME_COOKIE"
+fetch_page detail_ffac_anon_2 "/products/forest-friends-activity-cube"
+fetch_page detail_ffac_anon_3 "/products/forest-friends-activity-cube"
+fetch_page detail_hwx_anon "/products/heirloom-wooden-xylophone"
 fetch_page login_anon "/login"
 fetch_page login_member "/login" "$GOOD_COOKIE"
 fetch_page login_next_valid "/login?next=%2Fproducts%2Fforest-friends-activity-cube"
@@ -506,6 +543,57 @@ check "R3: redirect body has no product name" lacks "$P" "Forest Friends Activit
 check "R3: redirect body has no everyday price" lacks "$P" '$89.00'
 check "R3: redirect body has no member price" lacks "$P" '$71.20'
 check "R3: redirect body has no description" lacks "$P" "$FFAC_DESCRIPTION"
+
+# =====================================================================
+# P04-fix1: proxy redirect for members-only slugs (D-032)
+# =====================================================================
+
+# --- R10 / R4: logged-out Set B slug -> 307 from the proxy, no product data ----
+P="$(page detail_ffac_anon)"
+check "R10: GET /products/forest-friends-activity-cube (no cookie) status 307" status_is "$P" 307
+check "R10: Location resolves to /login?next=/products/forest-friends-activity-cube on the request origin" \
+  login_redirect_to "$P" "/products/forest-friends-activity-cube" "/products/forest-friends-activity-cube"
+check "R10: 307 body has no product name" lacks "$P" "Forest Friends Activity Cube"
+check "R10: 307 body has no everyday price \$89.00" lacks "$P" '$89.00'
+check "R10: 307 body has no member price \$71.20" lacks "$P" '$71.20'
+check "R10: 307 body has no description" lacks "$P" "$FFAC_DESCRIPTION"
+
+# NAME | label: other ways of having no valid session
+P04F1_NO_SESSION=(
+  "detail_ffac_badcookie|garbage session cookie"
+  "detail_ffac_expired|expired session cookie"
+  "detail_ffac_othername|valid token under another cookie name"
+  "detail_ffac_anon_2|no cookie, second request"
+  "detail_ffac_anon_3|no cookie, third request"
+)
+for row in "${P04F1_NO_SESSION[@]}"; do
+  IFS='|' read -r name label <<<"$row"
+  P="$(page "$name")"
+  check "R4: [$label] Set B detail status 307" status_is "$P" 307
+  check "R4: [$label] Location resolves to /login?next=/products/forest-friends-activity-cube" \
+    login_redirect_to "$P" "/products/forest-friends-activity-cube" "/products/forest-friends-activity-cube"
+  check "R4: [$label] 307 body has no product name" lacks "$P" "Forest Friends Activity Cube"
+  check "R4: [$label] 307 body has no member price \$71.20" lacks "$P" '$71.20'
+done
+
+P="$(page detail_hwx_anon)"
+check "R4: GET /products/heirloom-wooden-xylophone (no cookie) status 307" status_is "$P" 307
+check "R4: Location resolves to /login?next=/products/heirloom-wooden-xylophone" \
+  login_redirect_to "$P" "/products/heirloom-wooden-xylophone" "/products/heirloom-wooden-xylophone"
+check "R4: 307 body has no product name 'Heirloom Wooden Xylophone'" lacks "$P" "Heirloom Wooden Xylophone"
+
+# --- R10: public detail logged out and Set B detail logged in stay 200 --------
+check "R10: GET /products/cloud-bunny-plush (no cookie) status 200" status_is "$(page detail_cbp_anon)" 200
+check "R10: GET /products/cloud-bunny-plush (no cookie) has no Location header" \
+  test -z "$(header_val "$(page detail_cbp_anon)" "Location")"
+check "R10: GET /products/forest-friends-activity-cube (session) status 200" status_is "$(page detail_ffac_member)" 200
+check "R10: GET /products/forest-friends-activity-cube (session) contains \$71.20" has "$(page detail_ffac_member)" '$71.20'
+
+# --- R11: the Set B slug list is cached inside the running proxy -------------
+check "R11: server log has exactly one '[products] members-only slugs loaded:' line" \
+  count_is "$LOG" "[products] members-only slugs loaded:" 1
+check "R11: that line reads '[products] members-only slugs loaded: 4' (count only, no slug)" \
+  grep -q -E '\[products\] members-only slugs loaded: 4[[:space:]]*$' "$LOG"
 
 # --- R5: public product with a session -> member price only ----------------
 P="$(page detail_cbp_member)"

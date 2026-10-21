@@ -1,0 +1,1164 @@
+diff --git a/e2e/login.spec.ts b/e2e/login.spec.ts
+index 58a20fc..362bc24 100644
+--- a/e2e/login.spec.ts
++++ b/e2e/login.spec.ts
+@@ -1,32 +1,65 @@
+ // R17: login -> Set B visible -> logout (STATE.md P04 qa row), D-018 (`next` round trip).
++// Phase 04-fix1 R12: the redirect now comes from src/proxy.ts (D-032), and the post-login check
++// is anchored to the URL pathname, so `/login?next=/products/<slug>` can no longer satisfy it.
+ // Playwright, JS enabled (javaScriptEnabled: true, the project default).
+ import { expect, test } from "@playwright/test";
+ 
+ const SLUG = "forest-friends-activity-cube";
+ const DETAIL_PATH = `/products/${SLUG}`;
+ 
+-test("R17: login from a members-only product redirect reveals Set B pricing, logout hides it again", async ({
++test("R12 (P04 R17): login from a members-only product redirect reveals Set B pricing, logout hides it again", async ({
+   page,
+ }) => {
+   // Visiting a Set B product with no session redirects to /login?next=<encoded detail path>.
+   await page.goto(DETAIL_PATH);
+-  await expect(page).toHaveURL(new RegExp(`/login\\?next=(%2Fproducts%2F${SLUG}|${DETAIL_PATH.replace(/\//g, "\\/")})$`));
++  // Pathname /login with exactly one param, next, decoding to the detail path (either encoding).
++  await expect(page).toHaveURL(
++    (url) =>
++      url.pathname === "/login" &&
++      [...url.searchParams.keys()].join(",") === "next" &&
++      url.searchParams.get("next") === DETAIL_PATH,
++  );
+ 
+   // Any non-empty username/password is accepted (architecture.md Auth).
+   await page.getByPlaceholder("demo").fill("playwright-user");
+   await page.getByPlaceholder("Any password").fill("playwright-password");
+   await page.getByRole("button", { name: "Sign in" }).click();
+ 
+   // The post-login redirect lands back on the originally requested product, now showing
+   // the member price and the Members-only badge.
+-  await expect(page).toHaveURL(new RegExp(`${DETAIL_PATH}$`));
++  // R12: anchored to the pathname, not a suffix match on the whole URL.
++  await expect(page).toHaveURL((url) => url.pathname === DETAIL_PATH);
++  // The product page has rendered and the URL is still the product (a transient match while the
++  // browser passes through the product URL on its way elsewhere does not count).
++  await expect(page.getByRole("heading", { level: 1, name: "Forest Friends Activity Cube" })).toBeVisible();
++  expect(new URL(page.url()).pathname).toBe(DETAIL_PATH);
+   await expect(page.getByText("Member price", { exact: true })).toBeVisible();
+   await expect(page.getByText("$71.20", { exact: true })).toBeVisible();
+   await expect(page.getByText("Members only", { exact: true })).toBeVisible();
++  expect(new URL(page.url()).pathname).toBe(DETAIL_PATH);
+ 
+   // Signing out returns to / and drops the session: Set B content disappears again.
+   await page.getByRole("button", { name: "Sign out" }).click();
+-  await expect(page).toHaveURL(/\/$/);
++  await expect(page).toHaveURL((url) => url.pathname === "/");
++  // Phase 04-fix1 dispute: with cacheComponents on, Next keeps the previous route mounted under a
++  // hidden <Activity> (display: none) after client navigation, so whole-DOM counts would match
++  // content the visitor cannot see. The bundled docs say to be explicit about visibility
++  // (01-app/02-guides/preserving-ui-state.md, Testing). What the visitor sees on / must be the
++  // logged-out state.
++  await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
++  await expect(page.getByText("Signed in as").filter({ visible: true })).toHaveCount(0);
++  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
++  await expect(page.getByText("Forest Friends Activity Cube").filter({ visible: true })).toHaveCount(0);
++  await expect(page.getByText("Member price", { exact: true }).filter({ visible: true })).toHaveCount(0);
++  await expect(page.getByText("$71.20", { exact: true }).filter({ visible: true })).toHaveCount(0);
++  // The session itself is gone, not just hidden: no `session` cookie is left in the browser.
++  expect((await page.context().cookies()).some((cookie) => cookie.name === "session")).toBe(false);
++  // A fresh server response for / (a new document, so no hidden route is kept) carries no
++  // session UI and no Set B content anywhere in the DOM.
++  await page.reload();
++  await expect(page).toHaveURL((url) => url.pathname === "/");
++  await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+   await expect(page.getByText("Signed in as")).toHaveCount(0);
+   await expect(page.getByText("Forest Friends Activity Cube")).toHaveCount(0);
++  await expect(page.getByText("$71.20", { exact: true })).toHaveCount(0);
+ });
+diff --git a/scripts/verify-ssr.sh b/scripts/verify-ssr.sh
+index 1210ca6..daef7fa 100755
+--- a/scripts/verify-ssr.sh
++++ b/scripts/verify-ssr.sh
+@@ -1,19 +1,20 @@
+ #!/usr/bin/env bash
+ # SSR checks for the catalog (P03: R7, R13, R15-R23). Later phases extend this file.
+ # P04 additions: product detail (R1-R11), login (R12-R15) and route-level not-found (R2, R16).
+ # P05 additions: layout toggle island (P05 R3, R5, R6; R14 via the R18 loop).
++# P04-fix1 additions: proxy 307 for members-only slugs (R4, R10) and the slug-cache log (R11).
+ #
+ # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
+ # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
+ # as empty strings, D-021) and its own SESSION_SECRET, fetches pages with curl
+ # (no redirects followed), and asserts on the initial HTML. It mints its own
+ # session cookie with node + jose, so it never depends on the login UI.
+ #
+ # Prints one PASS/FAIL line per assertion and exits non-zero on any failure.
+ set -euo pipefail
+ 
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ cd "$ROOT"
+ 
+ # --- Environment (D-021, architecture.md Tests) -----------------------------
+ export CONTENTFUL_SPACE_ID=""
+@@ -67,30 +68,46 @@ check() {
+ # Non-overlapping occurrences of a fixed string.
+ occurrences() { { grep -o -F -- "$2" "$1" || true; } | wc -l | tr -d '[:space:]'; }
+ has() { grep -q -F -- "$2" "$1"; }
+ lacks() { ! grep -q -F -- "$2" "$1"; }
+ count_is() { [ "$(occurrences "$1" "$2")" -eq "$3" ]; }
+ count_ge() { [ "$(occurrences "$1" "$2")" -ge "$3" ]; }
+ status_is() { [ "$(cat "$1.status")" = "$2" ]; }
+ 
+ # Response header lookup (P04: redirects). fetch_page always writes "$1.headers".
+ header_val() {
+   local file="$1" name="$2"
+   { grep -i "^$name:" "$file.headers" || true; } | tail -n1 | sed -E 's/^[^:]+:[[:space:]]*//' | tr -d '\r\n'
+ }
+ location_is() { [ "$(header_val "$1" "Location")" = "$2" ]; }
+ 
++# P04-fix1 R4 rule: the Location, resolved against the request URL, is on the request origin,
++# has pathname /login and exactly one search param, next, whose decoded value is EXPECTED_NEXT.
++# Usage: login_redirect_to FILE REQUEST_PATH EXPECTED_NEXT (either encoding of next passes).
++cat >"$WORK/login-redirect.mjs" <<'JS'
++const [location, requestUrl, expectedNext] = process.argv.slice(2);
++if (!location) process.exit(1);
++const target = new URL(location, requestUrl);
++const ok =
++  target.origin === new URL(requestUrl).origin &&
++  target.pathname === "/login" &&
++  [...target.searchParams.keys()].join(",") === "next" &&
++  target.searchParams.get("next") === expectedNext;
++process.exit(ok ? 0 : 1);
++JS
++login_redirect_to() { node "$WORK/login-redirect.mjs" "$(header_val "$1" "Location")" "$BASE$2" "$3"; }
++
+ # Whole-tag lookup, attributes in any order, values compared in their
+ # HTML-escaped form. Usage: tag_count FILE TAG|* name=value ...
+ cat >"$WORK/tags.mjs" <<'JS'
+ import { readFileSync } from "node:fs";
+ const [file, tag, ...wanted] = process.argv.slice(2);
+ const html = readFileSync(file, "utf8");
+ const tagRe = tag === "*" ? /<([a-zA-Z][a-zA-Z0-9-]*)(\s[^>]*)?>/g : new RegExp(`<(${tag})(\\s[^>]*)?>`, "g");
+ const want = wanted.map((w) => {
+   const i = w.indexOf("=");
+   return [w.slice(0, i), w.slice(i + 1)];
+ });
+ let count = 0;
+ for (const m of html.matchAll(tagRe)) {
+   const attrs = new Map();
+   for (const a of (m[2] ?? "").matchAll(/([^\s"'=<>\/]+)(?:\s*=\s*"([^"]*)")?/g)) {
+@@ -253,30 +270,42 @@ if [ "$ready" -ne 1 ]; then
+ fi
+ echo "INFO: server up on $BASE (log: $LOG)"
+ 
+ # --- Session cookies --------------------------------------------------------
+ TOKEN="$(node --input-type=module -e '
+ import { SignJWT } from "jose";
+ const secret = new TextEncoder().encode(process.env.SESSION_SECRET);
+ const token = await new SignJWT({ name: "ssr-checker" })
+   .setProtectedHeader({ alg: "HS256" })
+   .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
+   .sign(secret);
+ process.stdout.write(token);
+ ')"
+ GOOD_COOKIE="session=$TOKEN"
+ BAD_COOKIE="session=not-a-jwt"
++# P04-fix1 R4: more cookies that carry no valid session.
++EXPIRED_TOKEN="$(node --input-type=module -e '
++import { SignJWT } from "jose";
++const secret = new TextEncoder().encode(process.env.SESSION_SECRET);
++const token = await new SignJWT({ name: "ssr-checker" })
++  .setProtectedHeader({ alg: "HS256" })
++  .setExpirationTime(Math.floor(Date.now() / 1000) - 60)
++  .sign(secret);
++process.stdout.write(token);
++')"
++EXPIRED_COOKIE="session=$EXPIRED_TOKEN"
++OTHER_NAME_COOKIE="not-session=$TOKEN"
+ 
+ # --- Fetch ------------------------------------------------------------------
+ fetch_page anon "/"
+ fetch_page member "/" "$GOOD_COOKIE"
+ fetch_page badcookie "/" "$BAD_COOKIE"
+ fetch_page bath "/?category=bath"
+ fetch_page washable "/?q=washable"
+ fetch_page washable_member "/?q=washable" "$GOOD_COOKIE"
+ fetch_page activity "/?category=activity-sensory"
+ fetch_page activity_member "/?category=activity-sensory" "$GOOD_COOKIE"
+ fetch_page zzz "/?q=zzz"
+ fetch_page robots_bogus "/?category=robots&layout=bogus"
+ fetch_page specs "/?layout=specs"
+ fetch_page washable_specs "/?q=washable&layout=specs"
+ fetch_page bath_specs "/?category=bath&layout=specs"
+@@ -285,30 +314,38 @@ fetch_page bogus "/?layout=bogus"
+ fetch_page specs_member "/?layout=specs" "$GOOD_COOKIE"
+ 
+ # Catalog-only pages, for the R20 "every catalog link keeps state" loop below: P04 adds
+ # non-catalog pages (detail, login, not-found) to $FETCHED for the R18 streaming check,
+ # but those never render the catalog's Clear-filters link or filter chips.
+ CATALOG_FETCHED="$FETCHED"
+ 
+ # P04: product detail, login, not-found
+ fetch_page detail_cbp_anon "/products/cloud-bunny-plush"
+ fetch_page detail_cbp_member "/products/cloud-bunny-plush" "$GOOD_COOKIE"
+ fetch_page detail_ffac_anon "/products/forest-friends-activity-cube"
+ fetch_page detail_ffac_member "/products/forest-friends-activity-cube" "$GOOD_COOKIE"
+ fetch_page detail_bbw_anon "/products/bubble-bath-whale"
+ fetch_page detail_unknown "/products/no-such-toy"
+ fetch_page detail_badslug "/products/Not-Valid-Slug"
++# P04-fix1: more logged-out (or invalid-session) Set B requests. With detail_ffac_anon above,
++# that is 7 requests for Set B slugs without a valid session (R11 needs at least 3).
++fetch_page detail_ffac_badcookie "/products/forest-friends-activity-cube" "$BAD_COOKIE"
++fetch_page detail_ffac_expired "/products/forest-friends-activity-cube" "$EXPIRED_COOKIE"
++fetch_page detail_ffac_othername "/products/forest-friends-activity-cube" "$OTHER_NAME_COOKIE"
++fetch_page detail_ffac_anon_2 "/products/forest-friends-activity-cube"
++fetch_page detail_ffac_anon_3 "/products/forest-friends-activity-cube"
++fetch_page detail_hwx_anon "/products/heirloom-wooden-xylophone"
+ fetch_page login_anon "/login"
+ fetch_page login_member "/login" "$GOOD_COOKIE"
+ fetch_page login_next_valid "/login?next=%2Fproducts%2Fforest-friends-activity-cube"
+ fetch_page login_next_unsafe "/login?next=%2F%2Fevil.com"
+ fetch_page login_error_missing "/login?error=missing"
+ fetch_page login_error_bogus "/login?error=bogus"
+ 
+ # --- R15: logged out --------------------------------------------------------
+ P="$(page anon)"
+ check "R15: GET / (no cookie) status 200" status_is "$P" 200
+ for n in "${PUBLIC_NAMES[@]}"; do check "R15: logged out contains public name '$n'" has "$P" "$n"; done
+ for n in "${AUTH_NAMES[@]}"; do check "R15: logged out lacks authenticated name '$n'" lacks "$P" "$n"; done
+ check "R15: '>Everyday price<' occurs exactly 8 times" count_is "$P" ">Everyday price<" 8
+ check "R15: '>Member price<' occurs 0 times" count_is "$P" ">Member price<" 0
+ for p in "${PUBLIC_EVERYDAY[@]}"; do check "R15: logged out contains everyday price $p" has "$P" "$p"; done
+@@ -495,30 +532,81 @@ check "R9: 'Material' row label present" has "$P" ">Material<"
+ check "R10: heading 'What makes it special'" has "$P" ">What makes it special<"
+ for f in "${CBP_FEATURES[@]}"; do check "R10: Cloud Bunny Plush feature '$f'" has "$P" "$f"; done
+ check "R10: check-icon circle uses quaternary (mint) fill" has "$P" "bg-quaternary"
+ 
+ # --- R11: 'Back to catalog' link (Cloud Bunny Plush) ------------------------
+ check "R11: exactly one 'Back to catalog' link on the detail screen" count_is "$P" ">Back to catalog<" 1
+ check "R11: 'Back to catalog' links to /" has "$P" 'href="/">Back to catalog<'
+ 
+ # --- R3: Set B product, no session -> redirect to /login, no product data --
+ P="$(page detail_ffac_anon)"
+ check "R3: redirect body has no product name" lacks "$P" "Forest Friends Activity Cube"
+ check "R3: redirect body has no everyday price" lacks "$P" '$89.00'
+ check "R3: redirect body has no member price" lacks "$P" '$71.20'
+ check "R3: redirect body has no description" lacks "$P" "$FFAC_DESCRIPTION"
+ 
++# =====================================================================
++# P04-fix1: proxy redirect for members-only slugs (D-032)
++# =====================================================================
++
++# --- R10 / R4: logged-out Set B slug -> 307 from the proxy, no product data ----
++P="$(page detail_ffac_anon)"
++check "R10: GET /products/forest-friends-activity-cube (no cookie) status 307" status_is "$P" 307
++check "R10: Location resolves to /login?next=/products/forest-friends-activity-cube on the request origin" \
++  login_redirect_to "$P" "/products/forest-friends-activity-cube" "/products/forest-friends-activity-cube"
++check "R10: 307 body has no product name" lacks "$P" "Forest Friends Activity Cube"
++check "R10: 307 body has no everyday price \$89.00" lacks "$P" '$89.00'
++check "R10: 307 body has no member price \$71.20" lacks "$P" '$71.20'
++check "R10: 307 body has no description" lacks "$P" "$FFAC_DESCRIPTION"
++
++# NAME | label: other ways of having no valid session
++P04F1_NO_SESSION=(
++  "detail_ffac_badcookie|garbage session cookie"
++  "detail_ffac_expired|expired session cookie"
++  "detail_ffac_othername|valid token under another cookie name"
++  "detail_ffac_anon_2|no cookie, second request"
++  "detail_ffac_anon_3|no cookie, third request"
++)
++for row in "${P04F1_NO_SESSION[@]}"; do
++  IFS='|' read -r name label <<<"$row"
++  P="$(page "$name")"
++  check "R4: [$label] Set B detail status 307" status_is "$P" 307
++  check "R4: [$label] Location resolves to /login?next=/products/forest-friends-activity-cube" \
++    login_redirect_to "$P" "/products/forest-friends-activity-cube" "/products/forest-friends-activity-cube"
++  check "R4: [$label] 307 body has no product name" lacks "$P" "Forest Friends Activity Cube"
++  check "R4: [$label] 307 body has no member price \$71.20" lacks "$P" '$71.20'
++done
++
++P="$(page detail_hwx_anon)"
++check "R4: GET /products/heirloom-wooden-xylophone (no cookie) status 307" status_is "$P" 307
++check "R4: Location resolves to /login?next=/products/heirloom-wooden-xylophone" \
++  login_redirect_to "$P" "/products/heirloom-wooden-xylophone" "/products/heirloom-wooden-xylophone"
++check "R4: 307 body has no product name 'Heirloom Wooden Xylophone'" lacks "$P" "Heirloom Wooden Xylophone"
++
++# --- R10: public detail logged out and Set B detail logged in stay 200 --------
++check "R10: GET /products/cloud-bunny-plush (no cookie) status 200" status_is "$(page detail_cbp_anon)" 200
++check "R10: GET /products/cloud-bunny-plush (no cookie) has no Location header" \
++  test -z "$(header_val "$(page detail_cbp_anon)" "Location")"
++check "R10: GET /products/forest-friends-activity-cube (session) status 200" status_is "$(page detail_ffac_member)" 200
++check "R10: GET /products/forest-friends-activity-cube (session) contains \$71.20" has "$(page detail_ffac_member)" '$71.20'
++
++# --- R11: the Set B slug list is cached inside the running proxy -------------
++check "R11: server log has exactly one '[products] members-only slugs loaded:' line" \
++  count_is "$LOG" "[products] members-only slugs loaded:" 1
++check "R11: that line reads '[products] members-only slugs loaded: 4' (count only, no slug)" \
++  grep -q -E '\[products\] members-only slugs loaded: 4[[:space:]]*$' "$LOG"
++
+ # --- R5: public product with a session -> member price only ----------------
+ P="$(page detail_cbp_member)"
+ check "R5: GET /products/cloud-bunny-plush (session) status 200" status_is "$P" 200
+ check "R5: '>Member price<' occurs exactly once, in accent-strong" count_is "$P" 'text-accent-strong">Member price<' 1
+ check "R5: contains '\$22.40'" has "$P" '$22.40'
+ check "R5: no '>Everyday price<'" lacks "$P" ">Everyday price<"
+ check "R5: no '\$28.00'" lacks "$P" '$28.00'
+ check "R5: no 'Sign in for member pricing'" lacks "$P" "Sign in for member pricing"
+ 
+ # --- R6: Set B product with a session -> found, Members only badge ---------
+ P="$(page detail_ffac_member)"
+ check "R6: GET /products/forest-friends-activity-cube (session) status 200" status_is "$P" 200
+ check "R6: contains product name" has "$P" "Forest Friends Activity Cube"
+ check "R6: contains '>Member price<'" has "$P" ">Member price<"
+ check "R6: contains '\$71.20'" has "$P" '$71.20'
+diff --git a/src/lib/products/members-only.test.ts b/src/lib/products/members-only.test.ts
+new file mode 100644
+index 0000000..eb35ad7
+--- /dev/null
++++ b/src/lib/products/members-only.test.ts
+@@ -0,0 +1,403 @@
++import "server-only";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++
++import mockData from "@/data/products.mock.json";
++import { productCollectionSchema, type ProductEntry, type Visibility } from "@/schemas/product";
++
++// Phase 04-fix1 R1-R3: src/lib/products/members-only.ts (contract: isMembersOnlySlug,
++// MEMBERS_ONLY_SLUGS_TTL_MS). The source and both adapters are mocked so each test controls
++// which adapter answers, when and with what; the mock adapter calls through to the real
++// mock data by default. No network.
++
++type Fetch = (sets: readonly Visibility[]) => Promise<ProductEntry[]>;
++
++const deps = vi.hoisted(() => ({
++  getProductSource: vi.fn<() => "mock" | "contentful">(),
++  fetchMockProducts: vi.fn<(sets: readonly ("public" | "authenticated")[]) => Promise<unknown[]>>(),
++  fetchContentfulProducts: vi.fn<(sets: readonly ("public" | "authenticated")[]) => Promise<unknown[]>>(),
++}));
++
++vi.mock("@/lib/products/source", async (importOriginal) => ({
++  ...(await importOriginal<object>()),
++  getProductSource: deps.getProductSource,
++}));
++vi.mock("@/lib/products/mock-adapter", async (importOriginal) => ({
++  ...(await importOriginal<object>()),
++  fetchMockProducts: deps.fetchMockProducts,
++}));
++vi.mock("@/lib/products/contentful-adapter", async (importOriginal) => ({
++  ...(await importOriginal<object>()),
++  fetchContentfulProducts: deps.fetchContentfulProducts,
++}));
++
++const LOG_PREFIX = "[products] members-only slugs loaded: ";
++const FIVE_MINUTES = 5 * 60 * 1000;
++
++const entries = productCollectionSchema.parse(mockData).items;
++const AUTH_ENTRIES = entries.filter((e) => e.fields.visibility === "authenticated");
++const PUBLIC_ENTRIES = entries.filter((e) => e.fields.visibility === "public");
++const AUTH_SLUGS = AUTH_ENTRIES.map((e) => e.fields.slug);
++const PUBLIC_SLUGS = PUBLIC_ENTRIES.map((e) => e.fields.slug);
++const SET_B = "forest-friends-activity-cube";
++const PUBLIC = "cloud-bunny-plush";
++const UNKNOWN = "no-such-toy";
++
++// Strings that fail SLUG_PATTERN (/^[a-z0-9]+(?:-[a-z0-9]+)*$/), several built from a real Set B slug.
++const PATTERN_FAILING = [
++  "Forest-Friends-Activity-Cube",
++  ` ${SET_B}`,
++  `${SET_B}/`,
++  `${SET_B}-`,
++  "forest--friends-activity-cube",
++  "../forest-friends-activity-cube",
++  "forest_friends_activity_cube",
++  "%2Fforest-friends-activity-cube",
++];
++
++const CONSOLE_METHODS = ["log", "info", "warn", "error", "debug", "trace"] as const;
++type Spies = Record<(typeof CONSOLE_METHODS)[number], ReturnType<typeof vi.spyOn>>;
++
++function spyConsole(): Spies {
++  return Object.fromEntries(
++    CONSOLE_METHODS.map((m) => [m, vi.spyOn(console, m).mockImplementation(() => {})]),
++  ) as Spies;
++}
++
++/** Each console call as the single line it prints (args joined by a space, like util.format). */
++function lines(spy: { mock: { calls: unknown[][] } }): string[] {
++  return spy.mock.calls.map((args) =>
++    args.map((a) => (typeof a === "string" ? a : (JSON.stringify(a) ?? String(a)))).join(" "),
++  );
++}
++
++function loadedLines(spies: Spies): string[] {
++  return CONSOLE_METHODS.flatMap((m) => lines(spies[m])).filter((l) => l.includes("members-only slugs loaded"));
++}
++
++function deferred<T>() {
++  let resolve!: (value: T) => void;
++  let reject!: (reason: unknown) => void;
++  const promise = new Promise<T>((res, rej) => {
++    resolve = res;
++    reject = rej;
++  });
++  return { promise, resolve, reject };
++}
++
++/** A copy of a real Set B entry under another slug (for the contentful-source cases). */
++function withSlug(entry: ProductEntry, slug: string): ProductEntry {
++  return { ...entry, sys: { ...entry.sys, id: `id-${slug}` }, fields: { ...entry.fields, slug } };
++}
++
++/** Fresh module instance: the in-memory cache starts empty (spec Contract: vi.resetModules + re-import). */
++async function fresh() {
++  vi.resetModules();
++  return import("@/lib/products/members-only");
++}
++
++let realFetchMock: Fetch;
++let spies: Spies;
++
++describe("products/members-only", () => {
++  beforeEach(async () => {
++    vi.stubEnv("CONTENTFUL_SPACE_ID", "");
++    vi.stubEnv("CONTENTFUL_ENVIRONMENT", "");
++    vi.stubEnv("CONTENTFUL_DELIVERY_TOKEN", "");
++    spies = spyConsole();
++    const actual = await vi.importActual<{ fetchMockProducts: Fetch }>("@/lib/products/mock-adapter");
++    realFetchMock = actual.fetchMockProducts;
++    deps.getProductSource.mockReset().mockReturnValue("mock");
++    deps.fetchMockProducts.mockReset().mockImplementation((sets) => realFetchMock(sets));
++    deps.fetchContentfulProducts
++      .mockReset()
++      .mockRejectedValue(new Error("contentful adapter must not be called for the mock source"));
++  });
++
++  afterEach(() => {
++    vi.useRealTimers();
++    vi.restoreAllMocks();
++    vi.unstubAllEnvs();
++  });
++
++  // --- R1: exports and results ------------------------------------------------
++
++  it("R1: MEMBERS_ONLY_SLUGS_TTL_MS is 5 * 60 * 1000", async () => {
++    const { MEMBERS_ONLY_SLUGS_TTL_MS } = await fresh();
++    expect(MEMBERS_ONLY_SLUGS_TTL_MS).toBe(FIVE_MINUTES);
++  });
++
++  it("R1: isMembersOnlySlug returns a Promise", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    const result = isMembersOnlySlug(SET_B);
++    expect(result).toBeInstanceOf(Promise);
++    await result;
++  });
++
++  it.each(AUTH_SLUGS)("R1: authenticated slug %s resolves true", async (slug) => {
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(slug)).resolves.toBe(true);
++  });
++
++  it.each(PUBLIC_SLUGS)("R1: public slug %s resolves false", async (slug) => {
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(slug)).resolves.toBe(false);
++  });
++
++  it("R1: unknown slug no-such-toy resolves false", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(UNKNOWN)).resolves.toBe(false);
++  });
++
++  it("R1: every slug resolves correctly from one module instance (warm cache)", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    for (const slug of AUTH_SLUGS) await expect(isMembersOnlySlug(slug)).resolves.toBe(true);
++    for (const slug of [...PUBLIC_SLUGS, UNKNOWN]) await expect(isMembersOnlySlug(slug)).resolves.toBe(false);
++  });
++
++  it("R1: the mock source fetches with exactly ['authenticated']", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    expect(deps.fetchMockProducts.mock.calls).toStrictEqual([[["authenticated"]]]);
++  });
++
++  it("R1: the mock source never calls the contentful adapter", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    expect(deps.fetchContentfulProducts).not.toHaveBeenCalled();
++  });
++
++  it("R1: the contentful source fetches with exactly ['authenticated'] and never calls the mock adapter", async () => {
++    deps.getProductSource.mockReturnValue("contentful");
++    deps.fetchContentfulProducts.mockReset().mockResolvedValue(AUTH_ENTRIES);
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    expect(deps.fetchContentfulProducts.mock.calls).toStrictEqual([[["authenticated"]]]);
++    expect(deps.fetchMockProducts).not.toHaveBeenCalled();
++  });
++
++  it("R1: the contentful source answers from the contentful adapter's slugs, not the mock data", async () => {
++    deps.getProductSource.mockReturnValue("contentful");
++    deps.fetchContentfulProducts
++      .mockReset()
++      .mockResolvedValue([withSlug(AUTH_ENTRIES[0], "live-only-toy"), AUTH_ENTRIES[1]]);
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug("live-only-toy")).resolves.toBe(true);
++    await expect(isMembersOnlySlug(AUTH_ENTRIES[1].fields.slug)).resolves.toBe(true);
++    await expect(isMembersOnlySlug(AUTH_ENTRIES[2].fields.slug)).resolves.toBe(false);
++    await expect(isMembersOnlySlug(PUBLIC)).resolves.toBe(false);
++  });
++
++  it("R1: the empty string resolves false without fetching", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug("")).resolves.toBe(false);
++    expect(deps.fetchMockProducts).not.toHaveBeenCalled();
++    expect(deps.fetchContentfulProducts).not.toHaveBeenCalled();
++  });
++
++  it.each(PATTERN_FAILING)("R1: pattern-failing %j resolves false without fetching", async (slug) => {
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(slug)).resolves.toBe(false);
++    expect(deps.fetchMockProducts).not.toHaveBeenCalled();
++    expect(deps.fetchContentfulProducts).not.toHaveBeenCalled();
++  });
++
++  it("R1: a pattern-failing slug resolves false even when the adapter would fail", async () => {
++    deps.fetchMockProducts.mockReset().mockRejectedValue(new Error("adapter down"));
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug("Not-Valid-Slug")).resolves.toBe(false);
++  });
++
++  // --- R2: in-memory cache and log line ---------------------------------------
++
++  it("R2: many sequential calls within the TTL trigger exactly one adapter fetch", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    for (const slug of [SET_B, PUBLIC, UNKNOWN, ...AUTH_SLUGS, SET_B, SET_B]) await isMembersOnlySlug(slug);
++    expect(deps.fetchMockProducts).toHaveBeenCalledTimes(1);
++  });
++
++  it("R2: concurrent calls on a cold cache trigger exactly one adapter fetch", async () => {
++    const gate = deferred<ProductEntry[]>();
++    deps.fetchMockProducts.mockReset().mockImplementation(() => gate.promise);
++    const { isMembersOnlySlug } = await fresh();
++    const pending = [SET_B, PUBLIC, UNKNOWN, ...AUTH_SLUGS].map((slug) => isMembersOnlySlug(slug));
++    gate.resolve(AUTH_ENTRIES);
++    await Promise.all(pending);
++    expect(deps.fetchMockProducts).toHaveBeenCalledTimes(1);
++  });
++
++  it("R2: concurrent calls on a cold cache all resolve to the right answer", async () => {
++    const gate = deferred<ProductEntry[]>();
++    deps.fetchMockProducts.mockReset().mockImplementation(() => gate.promise);
++    const { isMembersOnlySlug } = await fresh();
++    const pending = Promise.all([SET_B, PUBLIC, UNKNOWN, ...AUTH_SLUGS].map((slug) => isMembersOnlySlug(slug)));
++    gate.resolve(AUTH_ENTRIES);
++    await expect(pending).resolves.toStrictEqual([true, false, false, true, true, true, true]);
++  });
++
++  it("R2: a call just before the TTL expires is still served from the cache", async () => {
++    vi.useFakeTimers();
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    vi.advanceTimersByTime(FIVE_MINUTES - 1000);
++    await expect(isMembersOnlySlug(SET_B)).resolves.toBe(true);
++    expect(deps.fetchMockProducts).toHaveBeenCalledTimes(1);
++  });
++
++  it("R2: the first call after the TTL expires fetches again", async () => {
++    vi.useFakeTimers();
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    vi.advanceTimersByTime(FIVE_MINUTES + 1000);
++    await expect(isMembersOnlySlug(SET_B)).resolves.toBe(true);
++    expect(deps.fetchMockProducts).toHaveBeenCalledTimes(2);
++  });
++
++  it("R2: after a refetch the new list is cached again for the next TTL window", async () => {
++    vi.useFakeTimers();
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    vi.advanceTimersByTime(FIVE_MINUTES + 1000);
++    await isMembersOnlySlug(SET_B);
++    vi.advanceTimersByTime(60_000);
++    await isMembersOnlySlug(PUBLIC);
++    await isMembersOnlySlug(SET_B);
++    expect(deps.fetchMockProducts).toHaveBeenCalledTimes(2);
++  });
++
++  it("R2: a refetch after expiry uses the new list (a product moved out of Set B)", async () => {
++    vi.useFakeTimers();
++    deps.fetchMockProducts.mockReset().mockResolvedValueOnce(AUTH_ENTRIES).mockResolvedValueOnce(AUTH_ENTRIES.slice(1));
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(AUTH_SLUGS[0])).resolves.toBe(true);
++    vi.advanceTimersByTime(FIVE_MINUTES + 1000);
++    await expect(isMembersOnlySlug(AUTH_SLUGS[0])).resolves.toBe(false);
++  });
++
++  it("R2: the first fetch logs exactly one console.info line '[products] members-only slugs loaded: 4'", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    expect(lines(spies.info).filter((l) => l.startsWith(LOG_PREFIX))).toStrictEqual([`${LOG_PREFIX}4`]);
++  });
++
++  it("R2: the loaded line is written only through console.info", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    expect(loadedLines(spies)).toStrictEqual([`${LOG_PREFIX}4`]);
++  });
++
++  it("R2: cached calls write no further loaded line", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    for (const slug of [SET_B, PUBLIC, UNKNOWN, SET_B]) await isMembersOnlySlug(slug);
++    expect(loadedLines(spies)).toHaveLength(1);
++  });
++
++  it("R2: concurrent calls on a cold cache write exactly one loaded line", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await Promise.all([SET_B, PUBLIC, UNKNOWN, ...AUTH_SLUGS].map((slug) => isMembersOnlySlug(slug)));
++    expect(loadedLines(spies)).toStrictEqual([`${LOG_PREFIX}4`]);
++  });
++
++  it("R2: each refetch after expiry logs one more loaded line with the new count", async () => {
++    vi.useFakeTimers();
++    deps.fetchMockProducts.mockReset().mockResolvedValueOnce(AUTH_ENTRIES).mockResolvedValueOnce(AUTH_ENTRIES.slice(1));
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    vi.advanceTimersByTime(FIVE_MINUTES + 1000);
++    await isMembersOnlySlug(SET_B);
++    expect(loadedLines(spies)).toStrictEqual([`${LOG_PREFIX}4`, `${LOG_PREFIX}3`]);
++  });
++
++  it("R2: the count comes from the active source (contentful returning 2 entries logs 2)", async () => {
++    deps.getProductSource.mockReturnValue("contentful");
++    deps.fetchContentfulProducts.mockReset().mockResolvedValue(AUTH_ENTRIES.slice(0, 2));
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B);
++    expect(loadedLines(spies)).toStrictEqual([`${LOG_PREFIX}2`]);
++  });
++
++  it("R2: a pattern-failing slug on a cold cache logs no loaded line", async () => {
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug("Not-Valid-Slug");
++    await isMembersOnlySlug("");
++    expect(loadedLines(spies)).toStrictEqual([]);
++  });
++
++  it("R2: no console output contains a slug, a product name or a CONTENTFUL_* value", async () => {
++    const SPACE = "space-id-secret-abc123";
++    const ENVIRONMENT = "env-secret-xyz789";
++    const TOKEN = "delivery-token-secret-0123456789";
++    vi.stubEnv("CONTENTFUL_SPACE_ID", SPACE);
++    vi.stubEnv("CONTENTFUL_ENVIRONMENT", ENVIRONMENT);
++    vi.stubEnv("CONTENTFUL_DELIVERY_TOKEN", TOKEN);
++    deps.getProductSource.mockReturnValue("contentful");
++    deps.fetchContentfulProducts.mockReset().mockResolvedValue(AUTH_ENTRIES);
++    const { isMembersOnlySlug } = await fresh();
++    for (const slug of [SET_B, PUBLIC, UNKNOWN]) await isMembersOnlySlug(slug);
++    const printed = CONSOLE_METHODS.flatMap((m) => lines(spies[m])).join("\n");
++    for (const forbidden of [
++      ...AUTH_SLUGS,
++      ...AUTH_ENTRIES.map((e) => e.fields.name),
++      PUBLIC,
++      UNKNOWN,
++      SPACE,
++      ENVIRONMENT,
++      TOKEN,
++    ]) {
++      expect(printed).not.toContain(forbidden);
++    }
++  });
++
++  // --- R3: adapter failure ----------------------------------------------------
++
++  it("R3: if the adapter fetch rejects, isMembersOnlySlug rejects", async () => {
++    deps.fetchMockProducts.mockReset().mockRejectedValue(new Error("adapter down"));
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(SET_B)).rejects.toThrow();
++  });
++
++  it("R3: a rejected fetch is not cached as false: the next call fetches again and resolves true", async () => {
++    deps.fetchMockProducts
++      .mockReset()
++      .mockRejectedValueOnce(new Error("adapter down"))
++      .mockImplementation((sets) => realFetchMock(sets));
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(SET_B)).rejects.toThrow();
++    await expect(isMembersOnlySlug(SET_B)).resolves.toBe(true);
++    expect(deps.fetchMockProducts).toHaveBeenCalledTimes(2);
++  });
++
++  it("R3: a rejected fetch for a public slug rejects too (no silent false)", async () => {
++    deps.fetchMockProducts.mockReset().mockRejectedValue(new Error("adapter down"));
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(PUBLIC)).rejects.toThrow();
++  });
++
++  it("R3: concurrent callers waiting on a rejected fetch all reject", async () => {
++    const gate = deferred<ProductEntry[]>();
++    deps.fetchMockProducts.mockReset().mockImplementationOnce(() => gate.promise);
++    const { isMembersOnlySlug } = await fresh();
++    const pending = [SET_B, PUBLIC].map((slug) => isMembersOnlySlug(slug));
++    gate.reject(new Error("adapter down"));
++    const settled = await Promise.allSettled(pending);
++    expect(settled.map((s) => s.status)).toStrictEqual(["rejected", "rejected"]);
++  });
++
++  it("R3: a rejected fetch logs no loaded line", async () => {
++    deps.fetchMockProducts.mockReset().mockRejectedValue(new Error("adapter down"));
++    const { isMembersOnlySlug } = await fresh();
++    await isMembersOnlySlug(SET_B).catch(() => {});
++    expect(loadedLines(spies)).toStrictEqual([]);
++  });
++
++  it("R3: the contentful adapter rejecting makes isMembersOnlySlug reject, and the next call retries", async () => {
++    deps.getProductSource.mockReturnValue("contentful");
++    deps.fetchContentfulProducts
++      .mockReset()
++      .mockRejectedValueOnce(new Error("contentful down"))
++      .mockResolvedValue(AUTH_ENTRIES);
++    const { isMembersOnlySlug } = await fresh();
++    await expect(isMembersOnlySlug(SET_B)).rejects.toThrow();
++    await expect(isMembersOnlySlug(SET_B)).resolves.toBe(true);
++    expect(deps.fetchContentfulProducts).toHaveBeenCalledTimes(2);
++  });
++});
+diff --git a/src/lib/products/members-only.ts b/src/lib/products/members-only.ts
+new file mode 100644
+index 0000000..4160b19
+--- /dev/null
++++ b/src/lib/products/members-only.ts
+@@ -0,0 +1,47 @@
++import "server-only";
++
++import { fetchContentfulProducts } from "@/lib/products/contentful-adapter";
++import { fetchMockProducts } from "@/lib/products/mock-adapter";
++import { getProductSource } from "@/lib/products/source";
++import { SLUG_PATTERN } from "@/schemas/product";
++
++/** How long the Set B slug list is kept in memory before the next call refetches it (D-032). */
++export const MEMBERS_ONLY_SLUGS_TTL_MS = 5 * 60 * 1000;
++
++type CachedSlugs = { slugs: ReadonlySet<string>; expiresAt: number };
++
++let cached: CachedSlugs | undefined;
++let inFlight: Promise<ReadonlySet<string>> | undefined;
++
++/** Fetches the `authenticated` slugs from the active source and fills the cache. Rejections are not cached. */
++async function loadSlugs(): Promise<ReadonlySet<string>> {
++  const fetchProducts = getProductSource() === "contentful" ? fetchContentfulProducts : fetchMockProducts;
++  const entries = await fetchProducts(["authenticated"]);
++  const slugs: ReadonlySet<string> = new Set(entries.map((entry) => entry.fields.slug));
++  cached = { slugs, expiresAt: Date.now() + MEMBERS_ONLY_SLUGS_TTL_MS };
++  // Prints only the count, never a slug, name or env value.
++  console.info(`[products] members-only slugs loaded: ${slugs.size}`);
++  return slugs;
++}
++
++/** The cached slug list while it is fresh; otherwise one shared fetch for all concurrent callers. */
++function membersOnlySlugs(): Promise<ReadonlySet<string>> {
++  if (cached && Date.now() < cached.expiresAt) return Promise.resolve(cached.slugs);
++  if (!inFlight) {
++    inFlight = loadSlugs().finally(() => {
++      inFlight = undefined;
++    });
++  }
++  return inFlight;
++}
++
++/**
++ * True exactly for slugs of Set B (`authenticated`) products from the active source.
++ * Used by src/proxy.ts for its optimistic redirect only; the DAL stays the authorization check (D-017, D-032).
++ * Strings that fail SLUG_PATTERN resolve false without fetching. Rejects if the fetch fails.
++ */
++export async function isMembersOnlySlug(slug: string): Promise<boolean> {
++  if (!SLUG_PATTERN.test(slug)) return false;
++  const slugs = await membersOnlySlugs();
++  return slugs.has(slug);
++}
+diff --git a/src/proxy.test.ts b/src/proxy.test.ts
+index 09b6e25..0429176 100644
+--- a/src/proxy.test.ts
++++ b/src/proxy.test.ts
+@@ -1,115 +1,291 @@
+ import { SignJWT } from "jose";
++import { cookies } from "next/headers";
+ import { NextRequest } from "next/server";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+-// The proxy must read the cookie from request.cookies only; next/headers is a trap here.
++// The proxy must read the cookie from request.cookies only; next/headers is a trap here (R9).
+ vi.mock("next/headers", () => ({
+   cookies: vi.fn(async () => {
+     throw new Error("proxy must not call cookies() from next/headers");
+   }),
+ }));
+ 
++// Phase 04-fix1: the proxy asks src/lib/products/members-only.ts (contract: isMembersOnlySlug)
++// whether a slug is Set B. Mocked so each test controls the answer and can see every call.
++const membersOnly = vi.hoisted(() => ({
++  isMembersOnlySlug: vi.fn<(slug: string) => Promise<boolean>>(),
++  MEMBERS_ONLY_SLUGS_TTL_MS: 5 * 60 * 1000,
++}));
++vi.mock("@/lib/products/members-only", () => membersOnly);
++
++import mockData from "@/data/products.mock.json";
+ import { signSession } from "@/lib/session";
+ import { config, proxy } from "@/proxy";
+ 
+ const SECRET = "proxy-test-secret-0123456789-abcdefgh"; // > 32 chars
++const OTHER_SECRET = "some-other-secret-0123456789-abcdefgh";
++const ORIGIN = "http://localhost:3000";
+ const nowSeconds = () => Math.floor(Date.now() / 1000);
+ 
+-function loginRequest(cookie?: string, origin = "http://localhost:3000"): NextRequest {
++// Expected values from src/data/products.mock.json.
++const AUTH_SLUGS = mockData.items
++  .filter((e) => e.fields.visibility === "authenticated")
++  .map((e) => e.fields.slug);
++const SET_B = "forest-friends-activity-cube";
++const PUBLIC = "cloud-bunny-plush";
++const UNKNOWN = "no-such-toy";
++const PATTERN_FAILING = "Not-Valid-Slug";
++
++function request(path: string, cookie?: string, origin = ORIGIN): NextRequest {
+   const headers = new Headers();
+   if (cookie !== undefined) headers.set("cookie", cookie);
+-  return new NextRequest(`${origin}/login`, { headers });
++  return new NextRequest(`${origin}${path}`, { headers });
+ }
++const loginRequest = (cookie?: string, origin = ORIGIN) => request("/login", cookie, origin);
++const productRequest = (slug: string, cookie?: string, origin = ORIGIN) =>
++  request(`/products/${slug}`, cookie, origin);
+ 
+ function expectPassThrough(response: Response) {
+   expect(response.headers.get("location")).toBeNull();
+   expect(response.status).toBe(200);
+   expect(response.headers.get("x-middleware-next")).toBe("1");
+ }
+ 
++/** R4 rule: 307, Location on the request origin, pathname /login, exactly one param next=/products/<slug>. */
++function expectLoginRedirect(response: Response, requestUrl: string, slug: string) {
++  expect(response.status).toBe(307);
++  const location = response.headers.get("location");
++  expect(location).not.toBeNull();
++  const target = new URL(location as string, requestUrl);
++  expect(target.origin).toBe(new URL(requestUrl).origin);
++  expect(target.pathname).toBe("/login");
++  expect([...target.searchParams.keys()]).toStrictEqual(["next"]);
++  expect(target.searchParams.get("next")).toBe(`/products/${slug}`);
++}
++
++async function expiredToken() {
++  return new SignJWT({ name: "ada" })
++    .setProtectedHeader({ alg: "HS256" })
++    .setExpirationTime(nowSeconds() - 60)
++    .sign(new TextEncoder().encode(SECRET));
++}
++
++async function forgedToken() {
++  return new SignJWT({ name: "ada" })
++    .setProtectedHeader({ alg: "HS256" })
++    .setExpirationTime(nowSeconds() + 3600)
++    .sign(new TextEncoder().encode(OTHER_SECRET));
++}
++
++async function tamperedToken() {
++  const token = await signSession("ada");
++  const [header, payload, signature] = token.split(".");
++  const flipped = (signature[5] === "A" ? "B" : "A") as string;
++  return [header, payload, signature.slice(0, 5) + flipped + signature.slice(6)].join(".");
++}
++
++/** Cookie headers that carry no valid session (R4: missing, garbage, expired, wrong secret, other name). */
++const NO_SESSION_CASES: { label: string; cookie: () => Promise<string | undefined> }[] = [
++  { label: "no cookie", cookie: async () => undefined },
++  { label: "a garbage session cookie", cookie: async () => "session=not-a-jwt" },
++  { label: "an empty session cookie", cookie: async () => "session=" },
++  { label: "an expired session cookie", cookie: async () => `session=${await expiredToken()}` },
++  { label: "a session cookie signed by another secret", cookie: async () => `session=${await forgedToken()}` },
++  { label: "a tampered session cookie", cookie: async () => `session=${await tamperedToken()}` },
++  { label: "a valid token under another cookie name", cookie: async () => `not-session=${await signSession("ada")}` },
++];
++
+ describe("proxy", () => {
+   beforeEach(() => {
+     vi.stubEnv("SESSION_SECRET", SECRET);
++    vi.mocked(cookies).mockClear();
++    membersOnly.isMembersOnlySlug.mockReset().mockImplementation(async (slug) => AUTH_SLUGS.includes(slug));
+   });
+ 
+   afterEach(() => {
++    vi.restoreAllMocks();
+     vi.unstubAllEnvs();
+   });
+ 
+-  it("R14: /login with a valid session cookie redirects 307 to / on the request origin", async () => {
+-    const token = await signSession("ada");
+-    const response = await proxy(loginRequest(`session=${token}`));
++  // --- R4: Set B slug without a valid session -> 307 to /login?next=... ----------
++
++  it.each(NO_SESSION_CASES)("R4: /products/<Set B slug> with $label redirects 307 to /login?next=/products/<slug>", async ({ cookie }) => {
++    const req = productRequest(SET_B, await cookie());
++    expectLoginRedirect(await proxy(req), req.url, SET_B);
++  });
++
++  it.each(AUTH_SLUGS)("R4: every Set B slug redirects without a session (%s)", async (slug) => {
++    const req = productRequest(slug);
++    expectLoginRedirect(await proxy(req), req.url, slug);
++  });
++
++  it("R4: the redirect keeps a non-default request origin", async () => {
++    const req = productRequest(SET_B, undefined, "https://shop.example.test:8443");
++    expectLoginRedirect(await proxy(req), req.url, SET_B);
++  });
++
++  it("R4: a query string on the product URL is not carried into the redirect", async () => {
++    const req = request(`/products/${SET_B}?layout=specs&next=%2F%2Fevil.com`);
++    expectLoginRedirect(await proxy(req), req.url, SET_B);
++  });
++
++  it("R4: the redirect works when the session cookie sits among other cookies but is invalid", async () => {
++    const req = productRequest(SET_B, "theme=dark; session=not-a-jwt; other=1");
++    expectLoginRedirect(await proxy(req), req.url, SET_B);
++  });
++
++  // --- R5: pass-through cases on /products/<slug> -------------------------------
++
++  it("R5: /products/<Set B slug> with a valid session passes through", async () => {
++    expectPassThrough(await proxy(productRequest(SET_B, `session=${await signSession("ada")}`)));
++  });
++
++  it("R5: with a valid session isMembersOnlySlug is not called at all (Set B slug)", async () => {
++    await proxy(productRequest(SET_B, `session=${await signSession("ada")}`));
++    expect(membersOnly.isMembersOnlySlug).not.toHaveBeenCalled();
++  });
++
++  it("R5: with a valid session among other cookies isMembersOnlySlug is not called (public slug)", async () => {
++    const response = await proxy(productRequest(PUBLIC, `theme=dark; session=${await signSession("ada")}; x=1`));
++    expectPassThrough(response);
++    expect(membersOnly.isMembersOnlySlug).not.toHaveBeenCalled();
++  });
++
++  it("R5: no session + public slug passes through", async () => {
++    expectPassThrough(await proxy(productRequest(PUBLIC)));
++  });
++
++  it("R5: no session + unknown slug passes through", async () => {
++    expectPassThrough(await proxy(productRequest(UNKNOWN)));
++  });
++
++  it("R5: no session + pattern-failing slug passes through", async () => {
++    expectPassThrough(await proxy(productRequest(PATTERN_FAILING)));
++  });
++
++  it("R5: a garbage session cookie + public slug passes through", async () => {
++    expectPassThrough(await proxy(productRequest(PUBLIC, "session=not-a-jwt")));
++  });
++
++  it("R5: no session + a slug the helper reports false passes through even if it looks Set B-like", async () => {
++    membersOnly.isMembersOnlySlug.mockReset().mockResolvedValue(false);
++    expectPassThrough(await proxy(productRequest(SET_B)));
++  });
++
++  // --- R6: /login unchanged -----------------------------------------------------
++
++  it("R6: /login with a valid session cookie redirects 307 to / on the request origin", async () => {
++    const response = await proxy(loginRequest(`session=${await signSession("ada")}`));
+     expect(response.status).toBe(307);
+     expect(response.headers.get("location")).toBe("http://localhost:3000/");
+   });
+ 
+-  it("R14: the redirect keeps a non-default request origin", async () => {
+-    const token = await signSession("ada");
+-    const response = await proxy(loginRequest(`session=${token}`, "https://shop.example.test:8443"));
++  it("R6: the /login redirect keeps a non-default request origin", async () => {
++    const response = await proxy(loginRequest(`session=${await signSession("ada")}`, "https://shop.example.test:8443"));
+     expect(response.status).toBe(307);
+     expect(response.headers.get("location")).toBe("https://shop.example.test:8443/");
+   });
+ 
+-  it("R14: the redirect goes to / and ignores ?next", async () => {
+-    const token = await signSession("ada");
+-    const request = new NextRequest("http://localhost:3000/login?next=%2Fproducts%2Fx", {
+-      headers: { cookie: `session=${token}` },
+-    });
+-    const response = await proxy(request);
++  it("R6: the /login redirect goes to / and ignores ?next", async () => {
++    const req = request(`/login?next=%2Fproducts%2F${SET_B}`, `session=${await signSession("ada")}`);
++    const response = await proxy(req);
+     expect(response.status).toBe(307);
+     expect(response.headers.get("location")).toBe("http://localhost:3000/");
+   });
+ 
+-  it("R14: a valid session cookie is found among other cookies", async () => {
+-    const token = await signSession("ada");
+-    const response = await proxy(loginRequest(`theme=dark; session=${token}; other=1`));
++  it("R6: a valid session cookie is found among other cookies on /login", async () => {
++    const response = await proxy(loginRequest(`theme=dark; session=${await signSession("ada")}; other=1`));
+     expect(response.status).toBe(307);
+     expect(response.headers.get("location")).toBe("http://localhost:3000/");
+   });
+ 
+-  it("R15: /login with no cookie passes through", async () => {
+-    expectPassThrough(await proxy(loginRequest()));
++  it.each(NO_SESSION_CASES)("R6: /login with $label passes through", async ({ cookie }) => {
++    expectPassThrough(await proxy(loginRequest(await cookie())));
+   });
+ 
+-  it("R15: /login with a valid token under a different cookie name passes through", async () => {
+-    const token = await signSession("ada");
+-    expectPassThrough(await proxy(loginRequest(`not-session=${token}`)));
++  it("R6: /login?next=/products/<Set B slug> without a session passes through", async () => {
++    expectPassThrough(await proxy(request(`/login?next=%2Fproducts%2F${SET_B}`)));
+   });
+ 
+-  it("R15: /login with a garbage session cookie passes through", async () => {
+-    expectPassThrough(await proxy(loginRequest("session=not-a-jwt")));
++  it("R6: /login without a session never calls isMembersOnlySlug", async () => {
++    await proxy(request(`/login?next=%2Fproducts%2F${SET_B}`));
++    expect(membersOnly.isMembersOnlySlug).not.toHaveBeenCalled();
+   });
+ 
+-  it("R15: /login with an empty session cookie passes through", async () => {
+-    expectPassThrough(await proxy(loginRequest("session=")));
++  it("R6: /login with a valid session never calls isMembersOnlySlug", async () => {
++    await proxy(loginRequest(`session=${await signSession("ada")}`));
++    expect(membersOnly.isMembersOnlySlug).not.toHaveBeenCalled();
+   });
+ 
+-  it("R15: /login with a tampered session cookie passes through", async () => {
+-    const token = await signSession("ada");
+-    const [header, payload, signature] = token.split(".");
+-    const flipped = (signature[5] === "A" ? "B" : "A") as string;
+-    const tampered = [header, payload, signature.slice(0, 5) + flipped + signature.slice(6)].join(".");
+-    expectPassThrough(await proxy(loginRequest(`session=${tampered}`)));
++  it("R6: /login with a garbage session cookie never calls isMembersOnlySlug", async () => {
++    await proxy(loginRequest("session=not-a-jwt"));
++    expect(membersOnly.isMembersOnlySlug).not.toHaveBeenCalled();
++  });
++
++  // --- R7: helper failure -> fail open --------------------------------------------
++
++  it("R7: if isMembersOnlySlug rejects, the proxy resolves (does not throw)", async () => {
++    vi.spyOn(console, "error").mockImplementation(() => {});
++    vi.spyOn(console, "warn").mockImplementation(() => {});
++    membersOnly.isMembersOnlySlug.mockReset().mockRejectedValue(new Error("contentful down"));
++    await expect(proxy(productRequest(SET_B))).resolves.toBeDefined();
++  });
++
++  it("R7: if isMembersOnlySlug rejects, the request passes through (no redirect, no 500)", async () => {
++    vi.spyOn(console, "error").mockImplementation(() => {});
++    vi.spyOn(console, "warn").mockImplementation(() => {});
++    membersOnly.isMembersOnlySlug.mockReset().mockRejectedValue(new Error("contentful down"));
++    expectPassThrough(await proxy(productRequest(SET_B)));
++  });
++
++  it("R7: a rejection for one request does not stop the next request from redirecting", async () => {
++    vi.spyOn(console, "error").mockImplementation(() => {});
++    vi.spyOn(console, "warn").mockImplementation(() => {});
++    membersOnly.isMembersOnlySlug
++      .mockReset()
++      .mockRejectedValueOnce(new Error("contentful down"))
++      .mockImplementation(async (slug) => AUTH_SLUGS.includes(slug));
++    expectPassThrough(await proxy(productRequest(SET_B)));
++    const req = productRequest(SET_B);
++    expectLoginRedirect(await proxy(req), req.url, SET_B);
++  });
++
++  // --- R8: matcher --------------------------------------------------------------
++
++  it("R8: config is exactly { matcher: ['/login', '/products/:slug'] }", () => {
++    expect(config).toStrictEqual({ matcher: ["/login", "/products/:slug"] });
++  });
++
++  // --- R9: inputs come from request.cookies and request.nextUrl.pathname only ----
++
++  it("R9: the proxy never calls cookies() from next/headers on /products/<slug>", async () => {
++    await proxy(productRequest(SET_B));
++    await proxy(productRequest(PUBLIC, `session=${await signSession("ada")}`));
++    expect(cookies).not.toHaveBeenCalled();
+   });
+ 
+-  it("R15: /login with an expired session cookie passes through", async () => {
+-    const expired = await new SignJWT({ name: "ada" })
+-      .setProtectedHeader({ alg: "HS256" })
+-      .setExpirationTime(nowSeconds() - 60)
+-      .sign(new TextEncoder().encode(SECRET));
+-    expectPassThrough(await proxy(loginRequest(`session=${expired}`)));
++  it("R9: the proxy never calls cookies() from next/headers on /login", async () => {
++    await proxy(loginRequest());
++    await proxy(loginRequest(`session=${await signSession("ada")}`));
++    expect(cookies).not.toHaveBeenCalled();
+   });
+ 
+-  it("R15: /login with a session cookie signed by another secret passes through", async () => {
+-    const forged = await new SignJWT({ name: "ada" })
+-      .setProtectedHeader({ alg: "HS256" })
+-      .setExpirationTime(nowSeconds() + 3600)
+-      .sign(new TextEncoder().encode("some-other-secret-0123456789-abcdefgh"));
+-    expectPassThrough(await proxy(loginRequest(`session=${forged}`)));
++  it("R9: isMembersOnlySlug is called exactly once, with the slug from the pathname", async () => {
++    await proxy(productRequest(SET_B));
++    expect(membersOnly.isMembersOnlySlug.mock.calls).toStrictEqual([[SET_B]]);
+   });
+ 
+-  it("R16: config is exactly { matcher: ['/login'] } with no runtime option", () => {
+-    expect(config).toEqual({ matcher: ["/login"] });
+-    expect(config).not.toHaveProperty("runtime");
++  it("R9: the slug comes from the pathname, not from the query string", async () => {
++    const req = request(`/products/${PUBLIC}?slug=${SET_B}`);
++    expectPassThrough(await proxy(req));
++    expect(membersOnly.isMembersOnlySlug.mock.calls).toStrictEqual([[PUBLIC]]);
++  });
++
++  it("R9: a session passed in a header other than Cookie is ignored", async () => {
++    const token = await signSession("ada");
++    const req = new NextRequest(`${ORIGIN}/products/${SET_B}`, {
++      headers: { authorization: `Bearer ${token}`, "x-session": token },
++    });
++    expectLoginRedirect(await proxy(req), req.url, SET_B);
+   });
+ });
+diff --git a/src/proxy.ts b/src/proxy.ts
+index 15e87a4..09512a5 100644
+--- a/src/proxy.ts
++++ b/src/proxy.ts
+@@ -1,17 +1,40 @@
+ import { type NextRequest, NextResponse } from "next/server";
+ 
++import { isMembersOnlySlug } from "@/lib/products/members-only";
+ import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
+ 
++const PRODUCT_PATH_PREFIX = "/products/";
++
+ /**
+- * Optimistic redirect only (D-017): a visitor on /login who already holds a valid
+- * session cookie is sent to /. This is never the authorization check; the DAL is.
++ * Optimistic redirects only (D-017, D-032). This is never the authorization check; the DAL is.
++ * - /login with a valid session cookie: 307 to /.
++ * - /products/<slug> without a valid session, for a Set B slug: 307 to /login?next=/products/<slug>.
++ * Everything else passes through. A failed Set B lookup also passes through (fail open).
+  */
+ export async function proxy(request: NextRequest): Promise<NextResponse> {
+   const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
++  const { pathname } = request.nextUrl;
++
++  if (pathname.startsWith(PRODUCT_PATH_PREFIX)) {
++    if (session) return NextResponse.next();
++    const slug = pathname.slice(PRODUCT_PATH_PREFIX.length);
++    let membersOnly = false;
++    try {
++      membersOnly = await isMembersOnlySlug(slug);
++    } catch {
++      // Fail open: the page's DAL check still protects the data.
++      console.warn("[proxy] members-only lookup failed; passing the request through");
++    }
++    if (!membersOnly) return NextResponse.next();
++    const url = new URL("/login", request.url);
++    url.searchParams.set("next", PRODUCT_PATH_PREFIX + slug);
++    return NextResponse.redirect(url, 307);
++  }
++
+   if (session) {
+     return NextResponse.redirect(new URL("/", request.url));
+   }
+   return NextResponse.next();
+ }
+ 
+-export const config = { matcher: ["/login"] };
++export const config = { matcher: ["/login", "/products/:slug"] };

@@ -6,11 +6,11 @@ Owned by the orchestrator (`agents/orchestrator.md`). No other agent edits this 
 
 | Field | Value |
 |---|---|
-| Phase | none (batch run finished; next: OI-1 decision → phase-04 fix) |
-| Status | done <!-- not started / spec / build / review / done / escalated --> |
-| Build round | n/a |
-| Base commit | f7dff1f |
-| Open escalation | OI-1 (phase 04 R17), see `handoffs/OPEN-ISSUES.md`. Batch run finished; D-026 back in force from the next thread |
+| Phase | 07 suspense skeletons |
+| Status | spec <!-- not started / spec / build / review / done / escalated --> |
+| Build round | 0 |
+| Base commit | 8a147c9 |
+| Open escalation | none blocking (OI-2 non-blocking). Resume thread (D-026 suspended by the human for this thread): Step A docs → 04-fix1 → 07 → 08 |
 
 ## Phase plan
 
@@ -24,6 +24,9 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 04 detail + login | ui | `/products/[slug]` (307 to `/login?next=`, `notFound()` + `not-found.tsx`), `/login` page with `?error=missing` alert (`docs/design.md`) | Extend verify-ssr.sh (unknown slug 404, Set B slug 307 with `next`, logged-in detail price); add `playwright.config.ts` + browser install; e2e: login → Set B visible → logout | escalated (3 rounds used; OI-1, R17) | `wip(detail): phase 04 - detail + login (escalated: …)` |
 | 05 layout toggle | ui | Client island in `src/components/client/` replacing the P03 layout links (still real links without JS), `data-layout` on the grid, `group-data` switching, `history.replaceState` URL sync | e2e: toggle reorders cards with no navigation/reload; JS disabled: `?layout=specs` renders specs-first | done (1 round used) | `feat(layout): phase 05 - layout toggle` |
 | 06 release check | qa only | Runs every check against `next build && next start`, incl. the JS-disabled Playwright project | (none: no builder). Each failure becomes `phase-NN-fixK` for the owner of the failing path | done (all PASS except R17/OI-1; no fix phases) | `test(release): phase 06 - release check` |
+| 04-fix1 proxy redirect (OI-1) | data-auth | `src/lib/products/members-only.ts` (`isMembersOnlySlug`, in-memory TTL cache), `src/proxy.ts` 307 for logged-out Set B slugs, matcher adds `/products/:slug` (D-032) | Unit: helper (Set B true, others false, one fetch per TTL, log line), proxy (307 + Location, pass-through cases, fail open, matcher); verify-ssr: R3 307 + Location restored, one cache-fill log line over 3 requests; e2e: R17 URL check anchored to the pathname | spec | |
+| 07 suspense skeletons | ui | Remove every `instant = false`; `<Suspense>` + layout-matched skeletons around the request-dependent parts of `/`, `/products/[slug]`, `/login` and the header (D-031) | Remove D-031-dropped checks (verify-ssr streaming/fallback asserts, `chromium-no-js` project + `*.nojs.spec.ts`); keep both-directions response-body checks; add CLS e2e (< 0.01) on `/`, a filtered URL and a product page | not started | |
+| 08 release check | qa only | Every check against `next build && next start` (like 06) | (none: no builder). Each failure becomes `phase-08-fixK` for the owner of the failing path | not started | |
 
 ### Phase notes for spec writing
 
@@ -76,6 +79,11 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 05 | 1 | ui build: `src/components/client/layout-toggle.tsx` (new) + filter-card, product-grid, page; all checks pass, e2e 16/17 (only R17, OI-1); test lock intact | qa post-build PASS |
 | 05 | 1 | reviewer: PASS on R1–R15, G1–G6 | closed, committed |
 | 06 | 1 | qa release run (post-build mode, no builder): clean build OK, typecheck/lint/unit 305/boundary OK, verify-ssr 551/551, e2e 16/17 (only R17, OI-1), source scan/.env.example/git status OK; test lock intact; diff empty, no review | closed, committed; no fix phases |
+| 04-fix1 | 0 | qa pre-build: new `src/lib/products/members-only.test.ts` (51, all fail: missing module), rewritten `src/proxy.test.ts` (21 fail / 25 pass), verify-ssr R4/R10/R11 (16 fail / 594 pass), `e2e/login.spec.ts` R12 anchored to the pathname (fails: OI-1). `npm test` 72 failed / 318 passed. Build red until the helper exists (test type-checked by `next build`) | tests locked (`handoffs/phase-04-fix1/tests.sha`, 21 files) |
+| 04-fix1 | 1 | data-auth build: `src/lib/products/members-only.ts` (new) + `src/proxy.ts`; typecheck/lint/unit 390/boundary/build/verify-ssr 610 pass; R11 holds under `next start` (1 cache-fill line for 7 requests); e2e 16/17, disputed `e2e/login.spec.ts` lines 44-45 (whole-DOM counts hit the hidden `<Activity>` copy of the previous page after sign-out); test lock intact | qa dispute |
+| 04-fix1 | 1 | qa dispute: test was wrong; post-sign-out checks made visibility-aware, plus no `session` cookie and whole-DOM counts after `page.reload()`; re-locked (21 files). Builder not re-dispatched (nothing in its paths, P01 precedent) | qa post-build |
+| 04-fix1 | 1 | qa post-build PASS: typecheck, lint, unit 390/390, boundary, build, verify-ssr 610/610, e2e 17/17 (R12 5/5 with `--repeat-each=5`); lock intact | review |
+| 04-fix1 | 1 | reviewer: PASS on R1–R14, G1–G6 (notes: hidden Set B DOM after sign-out → OI-2) | closed, committed; OI-1 closed |
 
 ## Human checks
 
@@ -88,3 +96,4 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 04 detail + login (wip, escalated) | DEFERRED (batch run) | OI-1 open; see `handoffs/phase-04/human-check.md` |
 | 05 layout toggle (f7dff1f) | DEFERRED (batch run) | see `handoffs/phase-05/human-check.md` |
 | 06 release check | DEFERRED (batch run) | see `handoffs/phase-06/human-check.md` |
+| 04-fix1 proxy redirect | DEFERRED (batch run) | see `handoffs/phase-04-fix1/human-check.md`; OI-2 open (non-blocking) |
