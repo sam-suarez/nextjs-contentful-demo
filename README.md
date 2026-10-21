@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tiny Confetti: a Next.js + Contentful toy catalog built by a Markdown agent team
 
-## Getting Started
+A small product catalog with simulated login, members-only products and member pricing, all rendered on the server. The app was built by a team of specialised AI agents defined in Markdown (`/agents/`), run phase by phase with Claude Code.
 
-First, run the development server:
+- **Live app:** not deployed yet
+- **Demo login:** any username and any password
+- **How the agents work, and what went wrong:** [AGENT.md](AGENT.md)
+
+## Features
+
+- **Simulated auth.** Any non-empty username and password signs you in. The server sets a signed, `httpOnly` session cookie (jose HS256) and uses it to protect routes.
+- **Role-based content and pricing.** Logged out, you see 8 public toys at everyday prices. Signed in, you also see 4 members-only toys, and every toy shows its member price. Visiting a members-only product while logged out redirects to sign-in, then back to the product.
+- **Server rendering.** Prices and members-only products are in the initial HTML response, rendered by server components. Client code is limited to one layout-toggle island that never receives prices or session data.
+- **Two layouts.** "Price first" and "Specs first", switched without a page reload and kept in the URL.
+- **Filtering.** Category chips, text search and Clear filters, all done on the server from URL parameters.
+- **Error handling.** Placeholder art for a missing image, an empty state for no results, and a 404 page for an unknown product.
+- **Loading states.** Layout-matched skeletons while session-dependent content streams in, with no layout shift.
+
+## Run locally
+
+Requires Node 24 (`.nvmrc`; Next.js 16 needs at least 20.9).
 
 ```bash
+npm install
+cp .env.example .env.local
+# Set SESSION_SECRET in .env.local (32+ characters), for example:
+#   openssl rand -base64 32
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Data source
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+With the three `CONTENTFUL_*` variables empty, the app uses the mock data in `src/data/products.mock.json`, so a fresh clone works with no CMS account. Set all three to read from the live Contentful space instead. The server logs one line naming the active source.
 
-## Learn More
+| Variable | Required | Notes |
+|---|---|---|
+| `SESSION_SECRET` | yes | 32+ characters; signs the session cookie |
+| `CONTENTFUL_SPACE_ID` | no | all three set = live Contentful |
+| `CONTENTFUL_ENVIRONMENT` | no | usually `master` |
+| `CONTENTFUL_DELIVERY_TOKEN` | no | Content Delivery API token (read-only) |
 
-To learn more about Next.js, take a look at the following resources:
+`npm run snapshot:contentful` regenerates the mock from the live space.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Checks
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Command | What it checks |
+|---|---|
+| `npm run typecheck` | TypeScript, including generated route types |
+| `npm run lint` | ESLint |
+| `npm test` | Unit tests (Vitest), 414 tests |
+| `scripts/check-client-boundary.sh` | `'use client'` appears only in `src/components/client/` |
+| `scripts/verify-ssr.sh` | Builds and starts the app, then checks the raw HTML with curl: prices and members-only products present with a session and absent without one, the 307 for members-only pages, sign-out, and more (495 assertions) |
+| `npm run build && npm run test:e2e` | End-to-end tests (Playwright, Chromium), 25 tests, including a layout-shift measurement. Install the browser once with `npx playwright install chromium` |
 
-## Deploy on Vercel
+All checks use the mock data and their own session secret, so they don't depend on `.env.local`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+For a manual pass in the browser, use [docs/manual-qa.md](docs/manual-qa.md).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy
+
+Not deployed yet. On Vercel: import the repository, set `SESSION_SECRET` (and the `CONTENTFUL_*` variables for live content), and deploy with the default Next.js settings.
+
+## Repository map
+
+| Path | What it is |
+|---|---|
+| `src/` | The app: routes in `src/app`, server components in `src/components`, the only client island in `src/components/client`, server-only data and auth in `src/lib` |
+| `agents/` | The agent team, one Markdown file per role. Start with `orchestrator.md` |
+| `.claude/` | What makes the agents runnable in Claude Code: thin subagent wrappers, path-scoped rules, hooks and the `/phase` command |
+| `handoffs/` | The pipeline's working files: one folder per phase (spec, qa, build, review, human check), the current state, the round log and the escalations |
+| `docs/` | Architecture, design spec, decision log, intervention log and the condensed assessment brief |
+| `AGENT.md` | The write-up: architecture, prompting strategy, trade-offs and manual interventions |
+| `AGENTS.md` | Managed by Next.js (`next dev` rewrites it); tells any coding agent to read the bundled Next.js 16 docs. Not the write-up |
