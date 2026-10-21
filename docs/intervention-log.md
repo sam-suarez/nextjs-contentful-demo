@@ -130,3 +130,10 @@ Append-only. Every "Where the instructions got in the way" item from each phase,
 | qa | `next build` type-checks `*.test.ts`, so the new unit test breaks the build before the helper exists; to show the pre-build verify-ssr/e2e failures qa set the file aside for one build. The role file doesn't mention this |
 | data-auth | `npm run test:e2e` is a required check, but its only failure was in a qa-owned test, so not every check could be green within data-auth's paths; recorded as a disputed test |
 | reviewer | Command-verified requirements (R10–R13) can never be shown by a diff; a literal "insufficient evidence → REVISE" would force a REVISE with nothing for the builder to fix. Judged on implementation + test code, run results left to qa |
+
+## Workflow optimisation (2026-10-21, between phase 07 rounds)
+
+| Agent | Item |
+|---|---|
+| human | **Human-authorized change to the agent system (D-033):** the human asked for the workflow to be optimised for speed and token use and approved all eleven items of the plan. The edits touch `agents/{orchestrator,qa,ui,data-auth,reviewer}.md`, `.claude/hooks/{guard-paths,typecheck-after-edit}.mjs`, `.claude/agents/qa-run.md` (new), `.claude/skills/phase/SKILL.md`, `handoffs/_templates/*`, `docs/decisions.md` (D-033), and add `docs/next-16-notes.md`. STATE.md was split into `STATE.md`, `handoffs/CONTRACTS.md` and `handoffs/LOG.md` with no content lost. Made in a plain session, not by the orchestrator. Phase 07 is mid-phase (round 2 built, not yet verified); it continues under the new procedure from step 5 |
+| human | STATE.md's phase plan row for 07 read "not started" while Current said build round 2; corrected to "build (round 2)" during the split |

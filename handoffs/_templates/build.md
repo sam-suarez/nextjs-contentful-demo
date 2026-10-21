@@ -4,7 +4,7 @@
 
 | File | Change | Requirement(s) |
 |------|--------|----------------|
-| `<path>` | created / edited / deleted: <what> | R1, R2 |
+| `<path>` | created / edited / deleted: <what, one line> | R1, R2 |
 
 ## Fixes this round
 
@@ -12,7 +12,9 @@
 
 ## Check output
 
-| Check | Result | Output (trimmed) |
+Output only for a FAIL, at most 15 lines.
+
+| Check | Result | Output (FAIL only) |
 |-------|--------|------------------|
 | `npm run typecheck` | PASS / FAIL | |
 | `npm run lint` | | |

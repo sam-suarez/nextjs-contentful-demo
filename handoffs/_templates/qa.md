@@ -10,17 +10,15 @@
 
 Requirements verified only by `review`: <IDs, or "none">
 
-**Run output (trimmed):**
-
-```
-<output>
-```
+**Run summary:** <pass/fail counts per check, plus at most 15 lines of output>
 
 **Why each failure is the expected one:** <e.g. "module @/lib/session not found: not built yet">
 
 ## Post-build
 
-| Check | Result | Output (trimmed) |
+Output only for a FAIL, at most 15 lines per check.
+
+| Check | Result | Output (FAIL only) |
 |-------|--------|------------------|
 | `npm run typecheck` | PASS / FAIL | |
 | `npm run lint` | | |
@@ -38,7 +36,7 @@ Requirements verified only by `review`: <IDs, or "none">
 
 ## Dispute
 
-<Only in dispute mode: test, spec line, decision (changed / kept), reason. Otherwise "none".>
+<Post-build with `Disputes:`, or dispute mode: test, file, spec line, decision (changed / kept), reason. Otherwise "none".>
 
 ## Open issues
 

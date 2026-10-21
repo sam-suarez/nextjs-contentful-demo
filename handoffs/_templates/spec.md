@@ -2,6 +2,8 @@
 
 **Builder:** <data-auth | ui>  ·  **Depends on:** <phase-NN commits, or none>  ·  **Written by:** orchestrator
 
+**Read:** architecture.md <sections>; design.md <sections, or none>. Builder and reviewer read only these (D-033).
+
 ## Goal
 
 <One or two sentences: what exists after this phase that didn't before.>
@@ -26,6 +28,7 @@ export function <name>(<args>): <return type>
 ```
 
 - <cookie names, URL formats, rendered text such as the price format ("$12.99"), redirect targets>
+- Expected data qa asserts on: <slugs, names, prices, counts from `src/data/products.mock.json`>
 
 ### Contract decisions
 

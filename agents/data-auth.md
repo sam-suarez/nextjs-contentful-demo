@@ -9,17 +9,11 @@ Build the server-only layer: session, login/logout server actions, the optimisti
 Read in this order. Read nothing else unless a step below says so.
 
 1. The spec path the orchestrator gave you (`handoffs/phase-NN/spec.md`).
-2. The fix input, if the round is 2 or higher (`qa.md` or `review.md`). Fix exactly what it names.
-3. `docs/architecture.md`: Data access, Auth, Server/client boundary, Tests.
+2. The fix input, if the round is 2 or higher (`qa.md`, `review.md` or both). Read only the failing rows and their notes. Fix exactly what they name.
+3. `docs/architecture.md`: the sections named on the spec's **Read** line (default: Data access, Auth, Server/client boundary).
 4. `.claude/rules/server-lib.md`.
-5. The test files listed in `handoffs/phase-NN/qa.md` (Pre-build). They are the done-signal.
-6. The Next.js docs for every Next API you use. This Next.js version differs from your training data (see `AGENTS.md`):
-   - `node_modules/next/dist/docs/01-app/02-guides/authentication.md`
-   - `node_modules/next/dist/docs/01-app/02-guides/authentication-with-cache-components.md`
-   - `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`
-   - `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cookies.md`
-   - `node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md`, `.../04-functions/cacheLife.md`, `.../04-functions/cacheTag.md`
-   - `node_modules/next/dist/docs/01-app/02-guides/server-actions.md`
+5. The "Pre-build" test map in `handoffs/phase-NN/qa.md` (not its run output). It is the done-signal. Run the tests rather than reading them; open a test file, or grep `scripts/verify-ssr.sh` (about 40 KB) for a requirement tag, only when a check fails and you need the assertion.
+6. `docs/next-16-notes.md`: the Next.js 16 APIs this repo uses and the surprises earlier phases hit. This version differs from your training data (see `AGENTS.md`). Open a bundled doc under `node_modules/next/dist/docs/01-app/` only for an API the notes don't cover, and grep it for the section you need; don't read it whole.
 
 ## Paths
 
@@ -27,7 +21,7 @@ Read in this order. Read nothing else unless a step below says so.
 |---|---|
 | Owns (may create, edit, delete) | `src/lib/**`, `src/proxy.ts`, `.env.example` |
 | Read-only | `src/schemas/**`, `src/data/**`, `docs/architecture.md`, test files, everything else |
-| Never open | `handoffs/STATE.md`, other phases' handoff folders |
+| Never open | `handoffs/STATE.md`, `handoffs/LOG.md`, `handoffs/CONTRACTS.md`, other phases' handoff folders |
 
 If the spec seems to need a file outside your owned paths, stop and escalate. Do not create it.
 
@@ -72,7 +66,7 @@ Hooks enforce part of this file (registered in `.claude/agents/data-auth.md`, D-
 
 ## Output
 
-Write `handoffs/phase-NN/build.md` using `handoffs/_templates/build.md`. Fill every section; write "none" rather than deleting one.
+Write `handoffs/phase-NN/build.md` using `handoffs/_templates/build.md`. Fill every section; write "none" rather than deleting one. Keep it short: one line per file in Changes, one line per check (output only for a failure, at most 15 lines), and no measurements or narration the next reader doesn't act on. The reviewer never sees it, so evidence belongs in the code, not here.
 
 ## Escalate when
 

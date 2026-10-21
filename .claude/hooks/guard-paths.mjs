@@ -9,26 +9,31 @@ import path from "node:path";
 
 const QA_OWNED = ["**/*.test.ts", "scripts/verify-ssr.sh", "e2e/**", "playwright.config.ts"];
 const STATE = "handoffs/STATE.md";
+// Orchestrator-only files (D-033): the round log and the contracts-as-built notes.
+const ORCH_ONLY = [STATE, "handoffs/LOG.md", "handoffs/CONTRACTS.md"];
+
+const QA = {
+  write: [...QA_OWNED, "handoffs/phase-*/qa.md"],
+  noRead: [...ORCH_ONLY, "handoffs/phase-*/review.md", "handoffs/phase-*/diff.patch"],
+};
 
 // write: owned globs. noWrite: wins over write. noRead: never open. readOnly: allowlist (reviewer).
 const ROLES = {
   orchestrator: {
-    write: ["handoffs/**", "docs/intervention-log.md"],
+    write: ["handoffs/**", "docs/intervention-log.md", "docs/next-16-notes.md"],
   },
   "data-auth": {
     write: ["src/lib/**", "src/proxy.ts", ".env.example", "handoffs/phase-*/build.md"],
     noWrite: QA_OWNED,
-    noRead: [STATE],
+    noRead: ORCH_ONLY,
   },
   ui: {
     write: ["src/app/**", "src/components/**", "next.config.ts", "handoffs/phase-*/build.md"],
     noWrite: QA_OWNED,
-    noRead: [STATE],
+    noRead: ORCH_ONLY,
   },
-  qa: {
-    write: [...QA_OWNED, "handoffs/phase-*/qa.md"],
-    noRead: [STATE, "handoffs/phase-*/review.md", "handoffs/phase-*/diff.patch"],
-  },
+  qa: QA,
+  "qa-run": QA, // same role as qa on a cheaper model (D-033)
   reviewer: {
     write: [],
     readOnly: [
@@ -39,6 +44,14 @@ const ROLES = {
       "docs/design.md",
       ".claude/rules",
       ".claude/rules/*.md",
+      // D-033: the current code around a hunk; handoffs/ stays closed (D-013 item 1).
+      "src",
+      "src/**",
+      "scripts",
+      "scripts/**",
+      "e2e",
+      "e2e/**",
+      "playwright.config.ts",
     ],
   },
 };

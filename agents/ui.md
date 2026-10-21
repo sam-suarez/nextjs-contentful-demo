@@ -9,19 +9,12 @@ Build the routes and components: the catalog, product detail, login page, header
 Read in this order. Read nothing else unless a step below says so.
 
 1. The spec path the orchestrator gave you (`handoffs/phase-NN/spec.md`).
-2. The fix input, if the round is 2 or higher (`qa.md` or `review.md`). Fix exactly what it names.
-3. `docs/architecture.md`: Routes, Directory layout, Server/client boundary, Filtering and layout, Error handling.
-4. `docs/design.md`: tokens, components, page shell, and the screens this phase builds. Copy (labels, headings, messages) is used verbatim, because qa's checks grep for it.
-5. `.claude/rules/ssr-rendering.md` and `.claude/rules/client-islands.md`.
-6. The test files and SSR checks listed in `handoffs/phase-NN/qa.md` (Pre-build). They are the done-signal.
-7. The DAL exports you call: `src/lib/dal.ts` (signatures only; do not change it).
-8. The Next.js docs for every Next API you use. This Next.js version differs from your training data (see `AGENTS.md`):
-   - `node_modules/next/dist/docs/01-app/02-guides/authentication-with-cache-components.md` (session reads behind `<Suspense>`)
-   - `node_modules/next/dist/docs/01-app/02-guides/streaming.md`
-   - `node_modules/next/dist/docs/01-app/03-api-reference/02-components/form.md`, `.../link.md`, `.../image.md`
-   - `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md`, `.../redirect.md`
-   - `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/not-found.md`
-   - `node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md`
+2. The fix input, if the round is 2 or higher (`qa.md`, `review.md` or both). Read only the failing rows and their notes. Fix exactly what they name.
+3. The `docs/architecture.md` and `docs/design.md` sections named on the spec's **Read** line, and only those (no Read line: the sections its Source column cites). Copy (labels, headings, messages) is used verbatim, because qa's checks grep for it.
+4. `.claude/rules/ssr-rendering.md` and `.claude/rules/client-islands.md`.
+5. The "Pre-build" test map in `handoffs/phase-NN/qa.md` (not its run output). It is the done-signal. Run the tests rather than reading them; open a test file, or grep `scripts/verify-ssr.sh` (about 40 KB) for a requirement tag, only when a check fails and you need the assertion.
+6. The DAL exports you call: `src/lib/dal.ts` (signatures only; do not change it).
+7. `docs/next-16-notes.md`: the Next.js 16 APIs this repo uses and the surprises earlier phases hit. This version differs from your training data (see `AGENTS.md`). Open a bundled doc under `node_modules/next/dist/docs/01-app/` only for an API the notes don't cover, and grep it for the section you need; don't read it whole.
 
 ## Paths
 
@@ -29,7 +22,7 @@ Read in this order. Read nothing else unless a step below says so.
 |---|---|
 | Owns (may create, edit, delete) | `src/app/**`, `src/components/**` (incl. `src/components/client/`), `next.config.ts` |
 | Read-only | `src/lib/**`, `src/schemas/**`, `src/data/**`, `public/**`, `docs/architecture.md`, `docs/design.md`, test files, everything else |
-| Never open | `handoffs/STATE.md`, other phases' handoff folders |
+| Never open | `handoffs/STATE.md`, `handoffs/LOG.md`, `handoffs/CONTRACTS.md`, other phases' handoff folders |
 
 If the spec seems to need a file outside your owned paths (for example a new DAL function), stop and escalate. Do not create it.
 
@@ -77,7 +70,7 @@ Hooks enforce part of this file (registered in `.claude/agents/ui.md`, D-029). E
 
 ## Output
 
-Write `handoffs/phase-NN/build.md` using `handoffs/_templates/build.md`. Fill every section; write "none" rather than deleting one.
+Write `handoffs/phase-NN/build.md` using `handoffs/_templates/build.md`. Fill every section; write "none" rather than deleting one. Keep it short: one line per file in Changes, one line per check (output only for a failure, at most 15 lines), and no measurements or narration the next reader doesn't act on. The reviewer never sees it, so evidence belongs in the code, not here.
 
 ## Escalate when
 

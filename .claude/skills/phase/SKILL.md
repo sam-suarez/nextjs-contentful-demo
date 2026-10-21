@@ -17,4 +17,4 @@ Human check for the previous phase: $ARGUMENTS
 
 If that line is empty and STATE.md shows a phase already `done` without a recorded human check, ask the human for the result before step 0 and do nothing else.
 
-From now on in this session, Edit and Write outside `handoffs/**` and `docs/intervention-log.md` are blocked by a hook. That is your Paths table enforced, not an error to work around.
+From now on in this session, Edit and Write outside `handoffs/**`, `docs/intervention-log.md` and `docs/next-16-notes.md` are blocked by a hook. That is your Paths table enforced, not an error to work around.
