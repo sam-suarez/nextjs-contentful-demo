@@ -60,3 +60,4 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 04-fix2 | 1 | ui step A: route.ts + header form; all checks pass except actions R10 (expected, step B); lock intact | data-auth step B round 1 |
 | 04-fix2 | 1 | data-auth step B: logout removed from actions.ts; all checks pass (unit 414, verify-ssr 495, e2e 25); lock intact; diff taken | qa-run post-build + reviewer (parallel) |
 | 04-fix2 | 1 | qa-run post-build PASS (unit 414, verify-ssr 495/495, e2e 25/25, build `◐`×3 + `/logout` `ƒ`, R9 grep empty); reviewer PASS R1–R12, G1–G6 (notes: host-only Origin compare vs architecture.md "origin" wording; no Host normalisation, fails closed) | closed, committed |
+| 04-fix2 | — | human check PASSED (in-thread) | — |

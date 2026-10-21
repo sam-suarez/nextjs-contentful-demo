@@ -45,4 +45,4 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 07 suspense skeletons | PASSED (VERIFY.md, 2026-10-21) | layout changes: accept all |
 | 08 release check | PASSED (VERIFY.md, 2026-10-21) | see `handoffs/phase-08/human-check.md` |
 | Decision numbering (Step A) | kept D-031/D-032 (2026-10-21) | |
-| 04-fix2 sign-out full page load | pending | see `handoffs/phase-04-fix2/human-check.md` |
+| 04-fix2 sign-out full page load (841459a) | PASSED (2026-10-21) | see `handoffs/phase-04-fix2/human-check.md` |
