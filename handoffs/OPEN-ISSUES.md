@@ -4,7 +4,9 @@ Escalations from the batch run (phases 04 → 05 → 06, one thread; D-026 suspe
 
 ## OI-1 · Phase 04 · R17 (and R3 by extension): signing in from a members-only redirect lands on `/`, not the product
 
-**Status:** open, escalated (3 of 3 build rounds used). Phase 04 committed as `wip(detail): … (escalated: …)`.
+**Status:** decided 2026-10-20: **option 1 (proxy redirect for Set B slugs)**, to be built as `phase-04-fix1` (data-auth). Was: escalated after 3 of 3 build rounds; phase 04 committed as `wip(detail): … (escalated: …)`.
+
+**Related human decision (same day):** remove `instant = false` everywhere and adopt `<Suspense>` with layout-matched skeletons (no layout shift); drop "works without JS" for streamed content but keep proving prices are in the initial HTML response (assessment Part 1 item 3). To be recorded as D-030 in `docs/decisions.md`; past commits stay as they are.
 
 **Requirement IDs:** R17 (e2e login → back to product). Related: R3 (server 307, dropped in spec Amendments round 3), R1.
 
@@ -35,9 +37,9 @@ Whichever you pick, `docs/architecture.md` (Server/client boundary, "`instant = 
 
 ## Non-blocking notes for the human (not escalations)
 
-- **P05 limitation:** after a JS layout toggle, the category chips, the search form's hidden `layout` input and Clear filters keep their pre-toggle hrefs, so following one drops the toggled layout (`handoffs/phase-05/spec.md` Contract decisions).
+- **P05 limitation (human: accepted, 2026-10-20):** after a JS layout toggle, the category chips, the search form's hidden `layout` input and Clear filters keep their pre-toggle hrefs, so following one drops the toggled layout (`handoffs/phase-05/spec.md` Contract decisions).
 - **P05 a11y:** hydrated layout options are `<a role="button" aria-pressed>`; Enter activates them, Space does not (reviewer note).
 - **P05:** `LayoutProvider` reads `useSearchParams()`, which only builds without `<Suspense>` because `/` is dynamic; keep `instant = false` on `/`.
-- **P06 R9:** `.env.example` has `CONTENTFUL_ENVIRONMENT=master` (a default, not a secret).
+- **P06 R9 (human: accepted, 2026-10-20):** `.env.example` has `CONTENTFUL_ENVIRONMENT=master` (a default, not a secret).
 - **Docs:** `docs/architecture.md` (Server/client boundary: `instant = false` "render fully on the server") and `agents/ui.md` are inaccurate for `/products/[slug]` (agents may not edit them).
 - **qa process:** during P05 pre-build, qa ran `pkill -f next-server`, which would also stop a dev server you had running.
