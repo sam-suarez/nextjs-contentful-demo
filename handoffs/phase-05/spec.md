@@ -60,7 +60,7 @@ export function LayoutToggle(props: { hrefs: Record<CatalogLayout, string> }): R
 
 ## Known failure (not gating this phase)
 
-`e2e/login.spec.ts` (P04 R17) fails because of open issue OI-1 (`handoffs/OPEN-ISSUES.md`). qa runs the whole suite and reports that one test as a known failure; it does not count against this phase's PASS. Any other e2e failure does.
+`e2e/login.spec.ts` (P04 R17) fails because of open issue OI-1 (`handoffs/ESCALATIONS.md`). qa runs the whole suite and reports that one test as a known failure; it does not count against this phase's PASS. Any other e2e failure does.
 
 ## Owned paths
 

@@ -5,7 +5,7 @@
 
 ## Escalation
 
-None. OI-1 is closed by this phase. A new non-blocking decision came up and is recorded as OI-2 in `handoffs/OPEN-ISSUES.md`: after a client-side sign-out, the previous Set B product page stays in the DOM, hidden by Next's `<Activity>`, until the next full page load.
+None. OI-1 is closed by this phase. A new non-blocking decision came up and is recorded as OI-2 in `handoffs/ESCALATIONS.md`: after a client-side sign-out, the previous Set B product page stays in the DOM, hidden by Next's `<Activity>`, until the next full page load.
 
 ## Verify it yourself (about 10 minutes)
 

@@ -84,4 +84,4 @@ grep -rn "export const instant" src ; find src/app -name 'loading.tsx'   # both 
 
 ## Where the instructions got in the way
 
-- The human's list names skeletons for "the catalog grid and count, the session part of the header, and the detail page body". Removing `instant = false` also forces `/login` (reads `searchParams` + session), the banner (session) and the filter card (`searchParams`, including the `useSearchParams()` island) behind a boundary, so Step A's design.md Skeleton entry and this spec add those. Flagged in `handoffs/VERIFY.md`.
+- The human's list names skeletons for "the catalog grid and count, the session part of the header, and the detail page body". Removing `instant = false` also forces `/login` (reads `searchParams` + session), the banner (session) and the filter card (`searchParams`, including the `useSearchParams()` island) behind a boundary, so Step A's design.md Skeleton entry and this spec add those. Flagged for the human check.

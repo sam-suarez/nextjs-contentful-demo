@@ -1,7 +1,6 @@
 # Progress
 
-**Current part:** 4 — Agent system design: **complete**
-**Previous parts:** 1 — Repo and tooling; 2 — Data model and Contentful; 3 — Architecture and conventions
+**Status:** complete. Parts 1–4 (setup, data model, architecture, agent system) were built in a plain session and are logged below. Part 5, the app itself, was built by the agent pipeline in phases 01–08 plus two fix phases; its state is in `handoffs/STATE.md` and the write-up in `AGENT.md`.
 
 ## Done in Part 1
 - `docs/assessment-summary.md` written (never re-read the PDF from now on)
@@ -51,19 +50,19 @@
 - Next loads `.env.local` itself but won't overwrite a var already in the environment (checked in `@next/env`), so checks force mock mode by exporting the `CONTENTFUL_*` vars as empty strings
 - Pre-build, `npm run typecheck` fails on qa's tests (imports of modules not built yet). Handled in D-029: per-edit typecheck only advises; the builder stop gate is where it must pass
 
-## Next step
-- Part 5 = Phase 01 (auth core, builder data-auth): new thread at the repo root, run `/phase` (first phase, no previous human check)
+## Done in Part 5 (the agent pipeline)
+- Phases 01 auth core, 02 data layer, 03 catalog, 04 detail + login, 05 layout toggle, 06 release check, 04-fix1 proxy redirect, 07 Suspense skeletons, 08 release check, 04-fix2 sign-out. One commit per phase; round history in `handoffs/LOG.md`
+- Two escalations, both decided by the human and closed by fix phases: OI-1 (D-031, D-032) and OI-2 (D-034); see `handoffs/ESCALATIONS.md`
+- D-033: workflow trimmed for speed and tokens after phase 07 round 1
+- Final counts (04-fix2): unit 414, verify-ssr 495, e2e 25
 
-## User-required patterns (D-013), build when their part arrives
-- ~~Part 3: path-scoped rules~~ done (`.claude/rules/`)
-- ~~Agent-design part: context-blind, read-only Reviewer agent~~ done (`agents/reviewer.md`, tools `Read, Grep`)
-- ~~Pipeline setup / before the first dry run~~ done (D-029, `.claude/hooks/`): hooks running typecheck + `scripts/verify-ssr.sh` after edits; SSR checks must assert both directions (Set B present when logged in, absent when logged out) AND that prices are not inside a `<div hidden>` streaming wrapper / no Suspense fallback text in the body (D-020 probe: curl+grep alone passes on streamed content)
-- Part 5 onward: every handoff ends with "where the instructions got in the way", feeding `docs/intervention-log.md` and AGENT.md
+## User-required patterns (D-013): all built
+- Path-scoped rules: `.claude/rules/`
+- Context-blind, read-only reviewer: `agents/reviewer.md`, tools `Read, Grep`
+- Hooks running the checks after edits: D-029, `.claude/hooks/`. SSR checks assert both directions on the response body
+- "Where the instructions got in the way" in every handoff, collected in `docs/intervention-log.md`
 
-## Open questions
-- Playwright config + browser install are deferred until e2e tests exist (qa, P04).
-- Does Claude Code apply `.claude/rules/` path rules inside subagents? Agent files tell builders to read their rules explicitly either way; confirm during the P01 dry run.
-- Interactive sessions: if a phase thread shows hooks not firing (a builder writes outside its paths unblocked), check the workspace trust prompt first.
-
-## Blockers
-- None
+## Open questions from Part 4, answered
+- Playwright: configured and Chromium installed by qa in P04.
+- Whether Claude Code applies `.claude/rules/` inside subagents was never settled; it doesn't matter, because each builder's role file tells it to read its rules explicitly.
+- Hooks did fire in `/phase` threads. Threads started from a pasted prompt ran with the orchestrator path guard off (intervention log), which led to `/phase` becoming the only entry point (D-033).

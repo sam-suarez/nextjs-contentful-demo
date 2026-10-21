@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# pipeline scratch: the reviewer's diff input (git has the same diff per phase commit)
+handoffs/phase-*/diff.patch

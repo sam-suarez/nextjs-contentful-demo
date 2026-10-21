@@ -1,11 +1,11 @@
 # Phase 06: Human check
 
 **Status:** closed (commit: see `git log --grep "phase 06"`)
-**Result:** PASSED (2026-10-21, via `handoffs/VERIFY.md`; the report named only 04-fix1 as failed)
+**Result:** PASSED (2026-10-21, via the batch checklist; the report named only 04-fix1 as failed)
 
 ## Escalation
 
-None new. Release is blocked only by OI-1 (`handoffs/OPEN-ISSUES.md`): `e2e/login.spec.ts` R17 fails, and it is the only failing check.
+None new. Release is blocked only by OI-1 (`handoffs/ESCALATIONS.md`): `e2e/login.spec.ts` R17 fails, and it is the only failing check.
 
 ## Verify it yourself (about 10 minutes)
 

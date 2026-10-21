@@ -1,11 +1,11 @@
 # Phase 04: Human check
 
 **Status:** escalated (committed as `wip(detail): phase 04 - detail + login (escalated: …)` under the batch-run override)
-**Result:** PASSED (2026-10-21, via `handoffs/VERIFY.md`; the report named only 04-fix1 as failed)
+**Result:** PASSED (2026-10-21, via the batch checklist; the report named only 04-fix1 as failed)
 
 ## Escalation
 
-R17 fails after 3 build rounds: signing in from the members-only redirect lands on `/` instead of the product. Evidence, cause, and the four options are in `handoffs/OPEN-ISSUES.md` OI-1 (failing line `e2e/login.spec.ts:23`; mechanism in `node_modules/next/dist/client/components/layout-router.js` / `redirect-boundary.js`; trace in `handoffs/phase-04/qa.md` "Post-build, round 3"). No reviewer pass ran this round: the round limit had already decided the outcome.
+R17 fails after 3 build rounds: signing in from the members-only redirect lands on `/` instead of the product. Evidence, cause, and the four options are in `handoffs/ESCALATIONS.md` OI-1 (failing line `e2e/login.spec.ts:23`; mechanism in `node_modules/next/dist/client/components/layout-router.js` / `redirect-boundary.js`; trace in `handoffs/phase-04/qa.md` "Post-build, round 3"). No reviewer pass ran this round: the round limit had already decided the outcome.
 
 ## Verify it yourself (about 10 minutes)
 
@@ -23,7 +23,7 @@ Run from the repo root.
 
 ## Continue in a new thread
 
-Decide OI-1 first (`handoffs/OPEN-ISSUES.md`), then:
+Decide OI-1 first (`handoffs/ESCALATIONS.md`), then:
 
 ```
 /phase FAILED: OI-1 decision = <1 proxy | 2 hard navigation | 3 generateStaticParams | 4 accept>

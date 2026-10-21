@@ -15,7 +15,7 @@ None. This phase was escalated before spec earlier in the same thread (D-034 was
 
 ## Verify it yourself (about 5 minutes)
 
-Run from the repo root. Export the setup from `handoffs/VERIFY.md` section 0 first: empty `CONTENTFUL_*` and a 32+ character `SESSION_SECRET`.
+Run from the repo root. First export `CONTENTFUL_SPACE_ID= CONTENTFUL_ENVIRONMENT= CONTENTFUL_DELIVERY_TOKEN=` (empty, so the mock data is used) and a `SESSION_SECRET` of 32+ characters.
 
 1. `npm test`. Expect: `414 passed` in 16 files.
 2. `rm -rf .next && npm run build; echo "exit=$?"`. Expect: `exit=0`. `/`, `/login` and `/products/[slug]` show `◐`, and `/logout` shows `ƒ`.

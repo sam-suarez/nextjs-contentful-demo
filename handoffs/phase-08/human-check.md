@@ -1,7 +1,7 @@
 # Phase 08: Human check
 
 **Status:** closed (commit: see `git log --grep "phase 08"`)
-**Result:** PASSED (2026-10-21, via `handoffs/VERIFY.md`; the report named only 04-fix1 as failed)
+**Result:** PASSED (2026-10-21, via the batch checklist; the report named only 04-fix1 as failed)
 
 ## Escalation
 
