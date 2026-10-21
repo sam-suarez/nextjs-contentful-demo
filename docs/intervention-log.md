@@ -16,3 +16,17 @@ Append-only. Every "Where the instructions got in the way" item from each phase,
 | data-auth | `agents/data-auth.md` input 6 lists the `use-cache`, `cacheLife`, `cacheTag` and auth-with-cache-components docs, which P01 doesn't use. Only skimmed |
 | data-auth | The Next auth guide's proxy example reads the cookie with `cookies()` from `next/headers`. The spec (and a qa trap) require `request.cookies`. The spec was followed |
 | reviewer | R19 and G1 are judged from what the diff leaves out. That only holds if the diff covers the whole tree, and the reviewer can't confirm this. (The orchestrator confirmed it does: `git add -A` + `git diff --cached HEAD`, excluding `handoffs/`.) |
+
+## Phase 02: data layer
+
+| Agent | Item |
+|---|---|
+| orchestrator | **Human intervention (start of thread):** the pasted continuation prompt kept its `Human check:` placeholder unfilled. The orchestrator asked; the human answered PASSED for phase 01. The thread again started from a paste, not `/phase`, so the D-029 orchestrator path-guard hook was not registered; Paths kept by hand |
+| orchestrator | D-014 says "logged-out requests only ever query `public`", but architecture.md Routes needs a logged-out Set B slug to 307 to `/login` while an unknown slug 404s, which takes a lookup in the authenticated set. Resolved in the spec by reducing that lookup to a bare `{ status }` (R13). D-014 should say "never return" rather than "never query" |
+| orchestrator | architecture.md gives `cacheLife(...)` without a profile; the spec picked `"hours"` |
+| orchestrator | architecture.md has the page validating search params; the spec moved the unknown-category rule into `filterProducts` so it is unit-tested in `src/lib`. `layout` validation stays in P03 |
+| orchestrator | The first qa pre-build dispatch ended with an API error (machine slept) after writing 5 of 6 test files and no `qa.md`. `agents/orchestrator.md` has no step for an interrupted subagent; qa was re-dispatched with the same inputs and finished |
+| qa | Vitest 5 defaults to `clearMocks: true`, so `vi.fn` call history from module import (e.g. `cache(...)` at load time) cannot be asserted inside an `it`. Neither architecture.md Tests nor `.claude/rules/tests.md` says so |
+| qa | Test files from the interrupted pre-build pass were in the tree, untracked, with no `qa.md`. `agents/qa.md` doesn't say whether to keep or rewrite them; qa reviewed them against the spec, kept them and extended one |
+| data-auth | `agents/data-auth.md` Owns lists `src/lib/**`, while the spec's Owned paths narrow the phase to seven files. Followed the spec; the role file could say the spec narrows it |
+| reviewer | The reviewer's never-open list covers `src/`, but the spec relies on facts outside the diff (P01's `verifySessionToken` signature, `SLUG_PATTERN`, mock data in the expected-results table). The reviewer judged against the diff and left data-dependent outcomes to qa |
