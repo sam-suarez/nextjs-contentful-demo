@@ -16,8 +16,8 @@ Read in this order. Read nothing else unless a step below says so.
 6. The test files and SSR checks listed in `handoffs/phase-NN/qa.md` (Pre-build). They are the done-signal.
 7. The DAL exports you call: `src/lib/dal.ts` (signatures only; do not change it).
 8. The Next.js docs for every Next API you use. This Next.js version differs from your training data (see `AGENTS.md`):
-   - `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/02-route-segment-config/instant.md`
-   - `node_modules/next/dist/docs/01-app/02-guides/instant-navigation.md`
+   - `node_modules/next/dist/docs/01-app/02-guides/authentication-with-cache-components.md` (session reads behind `<Suspense>`)
+   - `node_modules/next/dist/docs/01-app/02-guides/streaming.md`
    - `node_modules/next/dist/docs/01-app/03-api-reference/02-components/form.md`, `.../link.md`, `.../image.md`
    - `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md`, `.../redirect.md`
    - `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/not-found.md`
@@ -46,12 +46,12 @@ If the spec seems to need a file outside your owned paths (for example a new DAL
 
 - `'use client'` appears only under `src/components/client/`. Source: D-022.
 - Client islands receive UI state (current layout, current query string) and server-rendered `children` only. Never prices, product lists, Set B data or session data. Islands never import `src/lib/**`. Source: D-019, `.claude/rules/client-islands.md`.
-- `/` and `/products/[slug]` export `instant = false`. If the build reports runtime data accessed outside `<Suspense>`, the fix is `instant = false`, never `<Suspense>`. Source: D-020.
-- Never wrap prices or Set B in `<Suspense>`, and never add a `loading.tsx` above them. Source: D-020.
+- No route exports `instant = false`. Anything that reads request data (the session through the DAL, `searchParams`) sits inside an explicit `<Suspense>` whose fallback is the matching skeleton from `docs/design.md` (Skeleton): same outer size as the final component, so the swap causes no layout shift. No route-level `loading.tsx`. Source: D-031, architecture.md Server/client boundary.
+- Prices and Set B render only in server components inside those boundaries, never in a client island and never in a fallback. Source: D-031, D-019.
 - Pages get data only from the DAL (`src/lib/dal.ts`). No `cookies()`, no Contentful client, no `fetch` to Contentful. Source: D-017.
 - Await `searchParams` and validate them; ignore unknown `category` and `layout` values. Filter on the server. Source: D-019.
 - Filters use `next/form` with GET. Clear Filters is `<Link href="/">`. The layout toggle flips `data-layout` on the grid wrapper and keeps the URL in sync; cards reorder with `group-data-[layout=specs]:order-first`, with no refetch. Source: D-019.
-- Set B product slug without a session: 307 to `/login?next=/products/<slug>`. Unknown slug: `notFound()` plus a route-level `not-found.tsx`. Source: D-018, architecture.md Routes.
+- Set B product slug without a session: `src/proxy.ts` (data-auth) answers the 307 to `/login?next=/products/<slug>`; the page still handles the DAL's "requires login" result. Unknown slug: `notFound()` plus a route-level `not-found.tsx`. Source: D-018, D-032, architecture.md Routes.
 - Missing image: render a placeholder. Images: `next/image` with `unoptimized`; `images.ctfassets.net` in `next.config.ts` `images.remotePatterns`. Empty results: empty state with a Clear Filters link. Source: architecture.md Error handling.
 - Tailwind v4, CSS-first. No `tailwind.config.js`. Tokens live in `globals.css` `@theme`; components use token utilities, never raw hex values. Source: D-005, `docs/design.md`.
 - The root layout never reads the session. The session-aware header is rendered by the session routes; `/login` and `not-found.tsx` use the `minimal` header. Source: architecture.md Server/client boundary, `docs/design.md` Page shell.
@@ -84,7 +84,7 @@ Write `handoffs/phase-NN/build.md` using `handoffs/_templates/build.md`. Fill ev
 Stop, write what you found under "Open issues" in `build.md`, and return without guessing when:
 
 - the spec needs a path you don't own, a new DAL function, a new dependency, or a contract change
-- making a check pass seems to need `<Suspense>`, `loading.tsx` or `'use client'` outside `src/components/client/`
+- making a check pass seems to need `instant = false`, a `loading.tsx`, a skeleton that cannot match the final component's size, or `'use client'` outside `src/components/client/`
 - the spec and `docs/architecture.md` disagree
 - a Next.js API behaves differently from the bundled docs
 - a check fails for a reason outside your paths (tooling, environment, network)

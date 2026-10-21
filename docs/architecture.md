@@ -6,12 +6,12 @@ Source of truth for how the app is built. Agent definitions in `/agents/` and th
 
 Next.js 16 (App Router, Cache Components + Partial Prefetching on), React 19, TypeScript, Tailwind v4 (CSS-first, no `tailwind.config.js`), Contentful (live) or `src/data/products.mock.json` (mock), zod, jose, Vitest, Playwright.
 
-## Routes (D-017, D-018)
+## Routes (D-017, D-018, D-032)
 
 | Route | Renders | Auth |
 |---|---|---|
 | `/` | Catalog: one grid sorted by name. Set A always; with a session, Set B products are mixed into the same grid with a "Members only" badge. Filters + layout toggle | Public; content depends on session |
-| `/products/[slug]` | Product detail | Set B slug without session: 307 to `/login?next=/products/<slug>`. Unknown slug: `notFound()` |
+| `/products/[slug]` | Product detail | Set B slug without session: `src/proxy.ts` answers 307 to `/login?next=/products/<slug>` before rendering (D-032); the page still asks the DAL. Unknown slug: `notFound()` |
 | `/login` | Login form: `username` + `password`, any non-empty values are accepted; the password is never stored. Empty input redirects to `/login?error=missing` (keeping `next`) | Logged-in visitors are redirected to `/` |
 
 Logout is a server action, not a route. `next` is only followed if it is a same-origin relative path (starts with `/`, not `//`).
@@ -29,14 +29,14 @@ src/
 public/products/        product SVGs (source of truth for art)
 ```
 
-## Server/client boundary (D-019, D-020, D-022)
+## Server/client boundary (D-019, D-022, D-031)
 
 - Prices, Set B products and anything derived from the session render in **server components only**.
 - `'use client'` is allowed only under `src/components/client/`. Check: `scripts/check-client-boundary.sh`.
 - Client islands never receive prices, Set B data or session data as props. They receive plain UI state (e.g. the current layout) and server-rendered `children`.
-- Session routes (`/`, `/products/[slug]`, and `/login`, which reads the session to redirect) export `instant = false` so they render fully on the server and the HTML contains the prices in `<body>`.
-- The root layout never reads the session (that would make every route block). The session-aware site header is rendered by each session route; `/login` and `not-found.tsx` use a header variant that reads no session (`docs/design.md`, Page shell).
-- **Never** wrap prices or Set B content in `<Suspense>` or a `loading.tsx`. A probe showed streamed content lands in `<div hidden>` and a no-JS visitor sees only the fallback (D-020).
+- Session-dependent UI, and anything else that reads request data (the session cookie, `searchParams`), sits inside an explicit `<Suspense>` boundary whose fallback is a layout-matched skeleton (`docs/design.md`, Skeleton): the same outer size as the content it replaces, so the swap causes no layout shift. Boundaries wrap the parts that read request data (the session part of the header, the banner, the catalog filter card and grid, the product detail body, the login card), not whole pages through a `loading.tsx`. No route exports `instant = false`: it only switches off a dev-time validation and does not control rendering (D-031).
+- Prices and Set B still reach the browser in the initial HTML response: the streamed content is part of the same response body. Without JavaScript a visitor sees the skeleton in place of streamed content; that is accepted (D-031).
+- The root layout never reads the session. The session-aware site header is rendered by each session route; `/login` and `not-found.tsx` use a header variant that reads no session (`docs/design.md`, Page shell).
 
 ## Data access (D-016, D-017, D-020, D-021)
 
@@ -58,11 +58,14 @@ public/products/        product SVGs (source of truth for art)
 - Filter controls: search is `next/form` with GET (hidden inputs keep `category` and `layout`); category chips are `<Link>`s that keep `q` and `layout`. Clear Filters: `<Link href="/">`.
 - Layout toggle: a client island flips `data-layout` on the grid wrapper and keeps the URL in sync. Its options are real links, so it still works without JS. Both card variants are server-rendered; Tailwind `group-data-[layout=specs]:` utilities switch columns, orientation and the visible spec block, and move the single price element with `order-*`. No refetch. Until the island exists (P05), the options are plain server links.
 
-## Auth (D-012, D-017)
+## Auth (D-012, D-017, D-032)
 
 - Session cookie: named `session`, a jose HS256 JWT signed with `SESSION_SECRET` (required, at least 32 characters; session functions throw if it is missing or too short). Flags: `httpOnly`, `secure` in production, `sameSite: "lax"`, `path: "/"`, 7-day expiry. Payload holds only the display name and expiry.
 - Login and logout are server actions in `src/lib/auth/actions.ts`; they validate input with zod and re-check the session themselves.
-- `proxy.ts` (Node runtime in Next 16) does optimistic redirects only. It is never the authorization check.
+- `proxy.ts` (Node runtime in Next 16) does optimistic redirects only. It is never the authorization check. Its matcher covers `/login` and `/products/:slug`:
+  - `/login` with a valid session: 307 to `/`.
+  - `/products/<slug>` without a valid session, when the slug is a Set B (`authenticated`) product: 307 to `/login?next=/products/<slug>`, before rendering (D-032). Public and unknown slugs pass through.
+  - The proxy learns which slugs are Set B from a server-only helper in `src/lib/` that does not call Contentful on every request. The DAL still decides what a page receives.
 
 ## Error handling
 
@@ -71,9 +74,11 @@ public/products/        product SVGs (source of truth for art)
 - Empty filter results: an empty state with a Clear Filters link.
 - Unknown slug: `notFound()` with a route-level `not-found.tsx`.
 
-## Tests
+## Tests (D-031, D-032)
 
 - Unit tests are colocated `*.test.ts` files, run by Vitest in Node. `server-only` is aliased to an empty module in `vitest.config.mts`.
 - Unit tests use the mock data and never touch the network.
-- SSR checks (`scripts/verify-ssr.sh`, Playwright no-JS) run without `CONTENTFUL_*` vars so they get deterministic mock data. Because Next loads `.env.local` itself, the checks export the three vars as empty strings (Next never overwrites a var already in the environment) and set their own `SESSION_SECRET`.
-- SSR checks assert both directions: Set B and authenticated prices present with a session, absent without one. They also assert that prices are not inside a `<div hidden>` streaming wrapper and that no Suspense fallback text is in the body (D-020: curl + grep alone passes on streamed content).
+- SSR checks (`scripts/verify-ssr.sh`, Playwright) run without `CONTENTFUL_*` vars so they get deterministic mock data. Because Next loads `.env.local` itself, the checks export the three vars as empty strings (Next never overwrites a var already in the environment) and set their own `SESSION_SECRET`.
+- SSR checks assert both directions on the HTTP response body: Set B names and member prices present with a session, absent without one; everyday prices present without one (D-031). Streamed content counts, because it is in the same response; there are no streaming-wrapper, fallback-text or no-JS assertions.
+- The Set B slug redirect is checked at the HTTP level: a logged-out request gets status 307 with `Location: /login?next=/products/<slug>` (D-032).
+- Layout shift: an e2e test measures Cumulative Layout Shift with a `PerformanceObserver` while the skeletons are replaced, and expects it to stay below 0.01 (D-031).

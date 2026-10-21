@@ -107,12 +107,13 @@ Server components in `src/components/` unless marked as an island.
 | **Segmented control** (layout) | Label "Layout"; pill track in `muted`, two options "Price first" / "Specs first"; the active one is white with a 2 px `foreground` border and `shadow-pop`. Exposes `aria-pressed` (island) or `aria-current` (links) |
 | **Empty state** | Centred inside a sticker card: a cluster of three confetti shapes, heading "No toys match your search", body (copy below), secondary button "Clear filters" |
 | **Alert** | 2 px `foreground` border, `bg-secondary/20`, `rounded-lg`, `role="alert"` |
+| **Skeleton** | The `<Suspense>` fallback for content that reads request data (architecture.md Server/client boundary, D-031). Same outer size as the component it replaces at every breakpoint (same container, card frame, grid columns, row heights and min heights), so the swap causes no layout shift. Inside: `muted` blocks with `rounded-md` (pills where the real element is a pill) standing in for text, prices, images and buttons. A gentle pulse animation that is switched off under `prefers-reduced-motion: reduce`. The region carries `aria-busy="true"`; the blocks are `aria-hidden="true"` and contain no text, so no "Loading" copy appears. Server component, CSS only. Used for: the session part of the site header (Sign in button vs badge + name + Sign out), the catalog banner, the catalog filter card and grid (including the count; placeholder cards follow the grid's columns), the product detail body, and the login card (it reads `searchParams` and the session) |
 
 ## Page shell
 
 - **Root layout** (`src/app/layout.tsx`): fonts, cream dot-grid background, `<main>`, and the static **footer**. The root layout never reads the session: a session read there would make every route block (D-020).
 - **Site header** (a server component rendered by each page, not by the layout). Two variants:
-  - `session` (used by `/` and `/products/[slug]`, which already export `instant = false`): logo on the left. Logged out: primary button "Sign in" linking to `/login`. Logged in: "Member pricing" badge, "Signed in as **<name>**", and secondary button "Sign out" (a `<form>` posting the logout server action, so it works without JS).
+  - `session` (used by `/` and `/products/[slug]`): logo on the left. Logged out: primary button "Sign in" linking to `/login`. Logged in: "Member pricing" badge, "Signed in as **<name>**", and secondary button "Sign out" (a `<form>` posting the logout server action, so it works without JS).
   - `minimal` (used by `/login` and `not-found.tsx`): logo on the left, text link "Back to catalog" on the right. It reads no session.
 - **Container:** `max-w-6xl`, 16 px side padding on mobile, 24 px from `md`.
 - **Footer:** white strip, top border. Left: "Tiny Confetti demo catalog". Right: "Prices in USD. Member prices need sign-in."

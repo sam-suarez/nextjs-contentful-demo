@@ -168,7 +168,8 @@ Track the round count in STATE.md. A qa `FAIL` and a reviewer `REVISE` both use 
 - Never edit `src/`, tests or scripts, even for a one-character fix. Route it to the owner. Source: D-023.
 - One phase per thread, ending at the human gate. Source: D-026.
 - Requirements come from `docs/architecture.md`. When it is silent on architecture, escalate rather than invent. Source: architecture.md preamble.
-- Never wrap prices or Set B in `<Suspense>`, and never let a spec ask for it. Source: D-020.
+- Specs put request-dependent UI (session, `searchParams`) inside `<Suspense>` with layout-matched skeletons and never ask for `instant = false` or a `loading.tsx`. Prices and Set B render only in server components. Source: D-031.
+- A logged-out request for a Set B slug is redirected by `src/proxy.ts` (307 to `/login?next=/products/<slug>`); the DAL stays the authorization check. Source: D-032.
 - A thread starts with `/phase <human-check result>` (`.claude/skills/phase/SKILL.md`). It registers a hook that blocks your Edit/Write outside `handoffs/**` and `docs/intervention-log.md`. Each subagent has its own path guard; builders also have a stop gate that re-runs typecheck, unit tests and `verify-ssr.sh`. Source: D-029.
 
 ## Checks

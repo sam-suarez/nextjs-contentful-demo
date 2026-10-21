@@ -36,7 +36,7 @@ A hook (`.claude/agents/reviewer.md`, D-029) blocks Read and Grep outside the in
 
 - **G1** The diff touches only the spec's owned paths (plus qa-owned test files).
 - **G2** No `'use client'` outside `src/components/client/`.
-- **G3** No `<Suspense>` or `loading.tsx` around prices, Set B or session-derived content.
+- **G3** No `instant = false` and no `loading.tsx`. Content that reads request data (session, `searchParams`) sits inside an explicit `<Suspense>` whose fallback is a skeleton (`docs/design.md`, Skeleton) and contains no prices, Set B data or session data (D-031).
 - **G4** No secret or Contentful variable read through `NEXT_PUBLIC_`, and no secret in client code, logs or the session payload.
 - **G5** Every new file under `src/lib/**` starts with `import "server-only";`.
 - **G6** No client island receives prices, product lists, Set B data or session data as props, and none imports `src/lib/**`.
