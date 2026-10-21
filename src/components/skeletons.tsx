@@ -89,8 +89,8 @@ function PriceSkeleton() {
 /** Session controls in the header (Sign in button, or badge + name + Sign out). */
 export function HeaderSessionSkeleton() {
   return (
-    <div data-skeleton="header-session" aria-busy="true" className={`${HEADER_SESSION_SLOT} justify-end`}>
-      <span aria-hidden="true" className={`${PILL} h-12 w-36`} />
+    <div data-skeleton="header-session" aria-busy="true" className={HEADER_SESSION_SLOT}>
+      <span aria-hidden="true" className={`${PILL} h-12 w-30 max-[360px]:w-24 sm:w-36`} />
     </div>
   );
 }

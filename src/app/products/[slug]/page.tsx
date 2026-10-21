@@ -22,6 +22,7 @@ import {
   DETAIL_INFO_COLUMN,
   DETAIL_PRICE_CARD,
   DETAIL_PRICE_FOOTER,
+  DETAIL_PRICE_FOOTER_MEMBER,
   DETAIL_PRICE_FOOTER_STACK,
   DETAIL_SPECS,
   DETAIL_TITLE_TEXT,
@@ -111,7 +112,15 @@ async function ProductDetail({ params }: { params: PageProps<"/products/[slug]">
           <div className={DETAIL_PRICE_CARD}>
             <Price amount={product.price} tier={product.priceTier} />
             {isMember ? (
-              <div aria-hidden="true" className={`${DETAIL_PRICE_FOOTER} border-transparent`} />
+              <div className={`${DETAIL_PRICE_FOOTER} ${DETAIL_PRICE_FOOTER_MEMBER}`}>
+                <span className={`${ICON_CIRCLE} inline-flex shrink-0 items-center justify-center rounded-full border-2 border-foreground bg-quaternary text-foreground`}>
+                  <Check aria-hidden="true" strokeWidth={2.5} className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-bold">Member price applied</p>
+                  <p className="text-sm text-muted-foreground">You&apos;re signed in, so this price is yours.</p>
+                </div>
+              </div>
             ) : (
               <div className={`${DETAIL_PRICE_FOOTER} ${DETAIL_PRICE_FOOTER_STACK}`}>
                 <p className="text-sm text-muted-foreground">Members get lower prices on every toy.</p>

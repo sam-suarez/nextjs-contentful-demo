@@ -176,3 +176,9 @@ Append-only. Every "Where the instructions got in the way" item from each phase,
 | Agent | Item |
 |---|---|
 | human | **Manual cleanup, plain session (not the orchestrator).** `handoffs/OPEN-ISSUES.md` became `handoffs/ESCALATIONS.md` with each escalation's decision and fix written at the top (IDs unchanged). `handoffs/VERIFY.md` was retired once every item in it had been checked or decided; `docs/manual-qa.md` is the browser-only release checklist that replaces it. The reviewer's `diff.patch` inputs are no longer committed (gitignored; each equals its phase commit's diff). STATE.md, progress.md and the D-034 row in decisions.md were brought up to date. Mentions of `VERIFY.md` in the rows above refer to the retired file |
+
+## Mobile header and member price card, after deploy (2026-10-21)
+
+| Agent | Item |
+|---|---|
+| human | **Manual UI fix, plain session (not the pipeline).** After the Vercel deploy, the human asked for the logo and Sign in to share one row on mobile and for the logged-in mobile view to look less out of place. Changed `site-header.tsx`, `logo.tsx`, `skeletons.tsx` (header skeleton width), `ui-classes.ts` and the member branch of `products/[slug]/page.tsx`: one header row at every width, a member initial circle in place of the badge + name below `md`, and a "Member price applied" note in the price card's reserved 80 px for members. This replaces two of the phase 07 layout trade-offs. No test changed; typecheck, lint, unit 414, client boundary, verify-ssr 495/495, e2e 25/25 and layout-shift 36/36 (`--repeat-each=3`) pass. `docs/design.md` updated to match |

@@ -55,3 +55,8 @@ Start the app (see README, "Run locally"), open http://localhost:3000 and tick e
 
 - [ ] In DevTools → Network, set throttling to **Slow 4G**, then reload `/`: grey placeholder blocks show in the header, banner and catalog, then the real content appears in the same place without anything jumping.
 - [ ] Repeat at a phone width (375 px, DevTools device toolbar).
+
+## Phone width
+
+- [ ] At 375 px, logged out: the logo and **Sign in** share one row, vertically centred.
+- [ ] At 375 px, signed in: the logo, a yellow circle with your initial and **Sign out** share one row. On a members-only product, the price card shows "Member price applied" under the price.

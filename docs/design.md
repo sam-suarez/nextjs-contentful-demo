@@ -113,7 +113,7 @@ Server components in `src/components/` unless marked as an island.
 
 - **Root layout** (`src/app/layout.tsx`): fonts, cream dot-grid background, `<main>`, and the static **footer**. The root layout never reads the session: a session read there would make every route block (D-020).
 - **Site header** (a server component rendered by each page, not by the layout). Two variants:
-  - `session` (used by `/` and `/products/[slug]`): logo on the left. Logged out: primary button "Sign in" linking to `/login`. Logged in: "Member pricing" badge, "Signed in as **<name>**", and secondary button "Sign out" (a plain `<form method="post" action="/logout">`, so it works without JS; D-034). Below `md` the session controls sit on their own full-width 48 px row under the logo: logged out, "Sign in" drops below the logo; logged in, the badge sits above the "Signed in as" name, and long names are truncated with "…" (accepted after P07, D-031).
+  - `session` (used by `/` and `/products/[slug]`): logo on the left. Logged out: primary button "Sign in" linking to `/login`. Logged in: "Member pricing" badge, "Signed in as **<name>**", and secondary button "Sign out" (a plain `<form method="post" action="/logout">`, so it works without JS; D-034). The session controls always share one 48 px row with the logo, vertically centred and right-aligned. Below `md`, logged in, the badge and "Signed in as" name are visually hidden (kept for screen readers) and a 40 px `tertiary` circle with the name's initial stands in for them; from `md` they show in one row and long names are truncated with "…". Below `sm` header buttons use 16 px side padding; below 360 px the Sign in arrow and the initial circle are dropped so everything fits at 320 px (mobile header fix after deploy; replaces the P07 two-row header).
   - `minimal` (used by `/login` and `not-found.tsx`): logo on the left, text link "Back to catalog" on the right. It reads no session.
 - **Container:** `max-w-6xl`, 16 px side padding on mobile, 24 px from `md`.
 - **Footer:** white strip, top border. Left: "Tiny Confetti demo catalog". Right: "Prices in USD. Member prices need sign-in."
@@ -203,7 +203,7 @@ Catalog / Plush / Cloud Bunny Plush            (breadcrumb, text links)
 - Two columns from `lg` (image 7 columns, info 5), stacked below.
 - Breadcrumb category links to `/?category=<value>`.
 - **Logged out:** price card as above. "Sign in for member pricing" is a secondary button linking to `/login?next=/products/<slug>`. The prompt text and the button are always stacked (text above the button), whatever the card width (accepted after P07, D-031).
-- **Logged in:** label "Member price", amount in `accent-strong`, no sign-in row; the card keeps an empty area of the same height (about 80 px) where visitors see it, so the card is the same size in both states (accepted after P07, D-031). A members-only product shows the "Members only" badge next to the h1.
+- **Logged in:** label "Member price", amount in `accent-strong`, no sign-in row. In the same 80 px area (under the rule) members see a 40 px `quaternary` check circle with "Member price applied" (bold) and "You're signed in, so this price is yours." (`text-sm`, muted), vertically centred, so the card is the same size in both states (D-031; replaces the empty area accepted after P07). A members-only product shows the "Members only" badge next to the h1.
 - The features list is omitted when `features` is absent.
 
 ### Login `/login` (P04)

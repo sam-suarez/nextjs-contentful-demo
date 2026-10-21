@@ -3,7 +3,7 @@ import Link from "next/link";
 /** Three overlapping primitives (violet circle, pink triangle, yellow square) plus the wordmark. */
 export function Logo() {
   return (
-    <Link href="/" className="inline-flex min-h-12 items-center gap-2 rounded-full">
+    <Link href="/" className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-full">
       <svg
         aria-hidden="true"
         viewBox="0 0 40 40"

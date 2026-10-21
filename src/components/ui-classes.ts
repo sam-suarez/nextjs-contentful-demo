@@ -22,10 +22,17 @@ export const CARD_BASE = "rounded-xl border-2 border-foreground bg-card";
 // fixed heights, typography that sets the line height); colours stay in the components.
 
 /**
- * Session part of the site header: its own full-width row below `md`, one 48 px row beside the
- * logo from `md`. Fixed height in both session states, so the header never changes height.
+ * Session part of the site header: one 48 px row beside the logo at every width, right-aligned.
+ * Fixed height in both session states, so the header never changes height. Below `md` the
+ * logged-in state shows only the member avatar and Sign out, so it fits next to the logo.
  */
-export const HEADER_SESSION_SLOT = "flex h-12 w-full items-center gap-3 md:w-auto";
+export const HEADER_SESSION_SLOT = "flex h-12 min-w-0 items-center justify-end gap-2 md:gap-3";
+
+/** Header buttons: one line, 16 px side padding below `sm`, so they fit beside the logo. */
+export const HEADER_BUTTON_COMPACT = "whitespace-nowrap max-sm:px-4";
+
+/** Extras beside a header button (Sign in arrow, member avatar), dropped below 360 px for room. */
+export const HEADER_NARROW_HIDDEN = "max-[360px]:hidden";
 
 export const BANNER_FRAME = "border-b-2 border-border bg-card";
 
@@ -118,13 +125,16 @@ export const DETAIL_PRICE_CARD = `${CARD_BASE} sticker p-4`;
 
 /**
  * Row under the price: a fixed 80 px content box (one text-sm line, 12 px, a 48 px button) under
- * a rule. Logged out it holds the sign-in prompt; for members it stays empty with a transparent
- * rule, so the price card has the same height in both states and in the skeleton.
+ * a rule. Logged out it holds the sign-in prompt; for members a "Member price applied" note,
+ * centred in the same box, so the price card has the same height in both states and in the skeleton.
  */
 export const DETAIL_PRICE_FOOTER = "mt-3 box-content h-20 border-t-2 pt-3";
 
 /** Logged-out content of DETAIL_PRICE_FOOTER: the text line at the top, the button at the bottom. */
 export const DETAIL_PRICE_FOOTER_STACK = "flex flex-col items-start justify-between border-border";
+
+/** Member content of DETAIL_PRICE_FOOTER: a check icon and two text lines, vertically centred. */
+export const DETAIL_PRICE_FOOTER_MEMBER = "flex items-center gap-3 border-border";
 
 export const SECTION_HEADING = "mb-2 font-heading text-lg font-bold";
 
