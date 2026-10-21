@@ -1,9 +1,10 @@
-// End-to-end checks (Playwright, JS enabled). Starts its own `npm start` against the
-// already-built app with mock data forced, the same env pattern as scripts/verify-ssr.sh
-// (D-021, architecture.md Tests): CONTENTFUL_* blanked, own SESSION_SECRET.
+// End-to-end checks (Playwright). Starts its own `npm start` against the already-built
+// app with mock data forced, the same env pattern as scripts/verify-ssr.sh (D-021,
+// architecture.md Tests): CONTENTFUL_* blanked, own SESSION_SECRET.
 //
-// The no-JS project (D-009) arrives with the P05 layout-toggle island (qa.md R18/spec
-// "Out of scope"); until then this file has a single JS-enabled project.
+// P05 R13 (D-009): two projects, scoped by file name.
+//   chromium        JS enabled, runs every spec except `*.nojs.spec.ts`
+//   chromium-no-js  javaScriptEnabled: false, runs only `*.nojs.spec.ts`
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = process.env.PLAYWRIGHT_PORT ?? "3220";
@@ -18,7 +19,18 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: /\.nojs\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium-no-js",
+      testMatch: /\.nojs\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"], javaScriptEnabled: false },
+    },
+  ],
   webServer: {
     command: `npm start -- --port ${PORT}`,
     url: BASE_URL,

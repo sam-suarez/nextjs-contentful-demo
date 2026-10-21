@@ -1,0 +1,944 @@
+diff --git a/e2e/layout-toggle.nojs.spec.ts b/e2e/layout-toggle.nojs.spec.ts
+new file mode 100644
+index 0000000..be17fde
+--- /dev/null
++++ b/e2e/layout-toggle.nojs.spec.ts
+@@ -0,0 +1,75 @@
++// P05 R12 (no-JS) and R13 (project scoping): runs only in the "chromium-no-js" project
++// (javaScriptEnabled: false). The layout options are real links; prices stay visible.
++// Written from handoffs/phase-05/spec.md, mock data only (logged out, name order).
++import { expect, test, type Page } from "@playwright/test";
++
++// Logged-out catalog, name order (src/data/products.mock.json, P03 spec table).
++const PUBLIC_EVERYDAY = ["$14.00", "$28.00", "$16.00", "$12.00", "$24.00", "$32.00", "$11.00", "$9.00"];
++const PRICE = "Price first";
++const SPECS = "Specs first";
++
++function option(page: Page, text: string) {
++  return page.locator("a").filter({ hasText: new RegExp(`^\\s*${text}\\s*$`) });
++}
++
++function pathAndSearch(page: Page) {
++  const u = new URL(page.url());
++  return u.pathname + u.search;
++}
++
++async function firstCardLabelMinusH2(page: Page) {
++  const card = page.locator("article").first();
++  const label = await card.getByText("Everyday price", { exact: true }).boundingBox();
++  const h2 = await card.locator("h2").first().boundingBox();
++  if (!label || !h2) throw new Error("first card price label or <h2> not rendered");
++  return label.y - h2.y;
++}
++
++async function expectAllPricesVisible(page: Page) {
++  const cards = page.locator("article");
++  await expect(cards).toHaveCount(PUBLIC_EVERYDAY.length);
++  for (let i = 0; i < PUBLIC_EVERYDAY.length; i++) {
++    const card = cards.nth(i);
++    await expect(card.getByText("Everyday price", { exact: true })).toBeVisible();
++    await expect(card.getByText(PUBLIC_EVERYDAY[i]).first()).toBeVisible();
++  }
++}
++
++async function expectSpecsLayoutNoJs(page: Page) {
++  await expect(page.locator("[data-layout]")).toHaveCount(1);
++  await expect(page.locator("[data-layout]")).toHaveAttribute("data-layout", "specs");
++  await expect(option(page, SPECS)).toHaveAttribute("aria-current", "true");
++  await expect(option(page, PRICE)).not.toHaveAttribute("aria-current");
++  // No island ran: link semantics only (R5).
++  await expect(option(page, SPECS)).not.toHaveAttribute("aria-pressed");
++  await expect(option(page, PRICE)).not.toHaveAttribute("aria-pressed");
++  await expectAllPricesVisible(page);
++  expect(await firstCardLabelMinusH2(page), "price label below <h2> in specs layout").toBeGreaterThan(0);
++}
++
++test("R13: this file runs in the chromium-no-js project with JavaScript disabled", async ({}, testInfo) => {
++  expect(testInfo.project.name).toBe("chromium-no-js");
++  expect(testInfo.project.use.javaScriptEnabled).toBe(false);
++});
++
++test("R12: no-JS /?layout=specs renders the specs layout with Specs first current and every price visible", async ({
++  page,
++}) => {
++  await page.goto("/?layout=specs");
++  await expectSpecsLayoutNoJs(page);
++});
++
++test("R12: no-JS / shows the price layout with every price visible", async ({ page }) => {
++  await page.goto("/");
++  await expect(page.locator("[data-layout]")).toHaveAttribute("data-layout", "price");
++  await expect(option(page, PRICE)).toHaveAttribute("aria-current", "true");
++  await expectAllPricesVisible(page);
++});
++
++test("R12: no-JS clicking Specs first on / navigates via the real link to /?layout=specs", async ({ page }) => {
++  await page.goto("/");
++  await expect(option(page, SPECS)).toHaveAttribute("href", "/?layout=specs");
++  await Promise.all([page.waitForURL((u) => u.pathname + u.search === "/?layout=specs"), option(page, SPECS).click()]);
++  expect(pathAndSearch(page)).toBe("/?layout=specs");
++  await expectSpecsLayoutNoJs(page);
++});
+diff --git a/e2e/layout-toggle.spec.ts b/e2e/layout-toggle.spec.ts
+new file mode 100644
+index 0000000..724fcca
+--- /dev/null
++++ b/e2e/layout-toggle.spec.ts
+@@ -0,0 +1,295 @@
++// P05 layout toggle island, JS enabled (project "chromium").
++// R7 hydrated semantics, R8 instant toggle (no navigation, no refetch, replaceState),
++// R9 other params kept, R10 URL is the source of truth, R13 project scoping.
++// Written from handoffs/phase-05/spec.md (Requirements + Contract), mock data only.
++import { expect, test, type Page, type Request } from "@playwright/test";
++
++const PRICE = "Price first";
++const SPECS = "Specs first";
++
++/** The option `<a>` with exactly this text (role may be link or button, so match the tag). */
++function option(page: Page, text: string) {
++  return page.locator("a").filter({ hasText: new RegExp(`^\\s*${text}\\s*$`) });
++}
++
++/** The grid wrapper: the one element carrying `data-layout`. */
++function grid(page: Page) {
++  return page.locator("[data-layout]");
++}
++
++/** Path + search of the current URL, e.g. "/?layout=specs". */
++function pathAndSearch(page: Page) {
++  const u = new URL(page.url());
++  return u.pathname + u.search;
++}
++
++/** The island has mounted once `aria-pressed` appears on both options (R7). */
++async function waitForIsland(page: Page) {
++  await expect(option(page, PRICE)).toHaveAttribute("aria-pressed", /^(true|false)$/);
++  await expect(option(page, SPECS)).toHaveAttribute("aria-pressed", /^(true|false)$/);
++}
++
++async function expectLayout(page: Page, layout: "price" | "specs") {
++  await expect(grid(page)).toHaveCount(1);
++  await expect(grid(page)).toHaveAttribute("data-layout", layout);
++  await expect(option(page, PRICE)).toHaveAttribute("aria-pressed", layout === "price" ? "true" : "false");
++  await expect(option(page, SPECS)).toHaveAttribute("aria-pressed", layout === "specs" ? "true" : "false");
++}
++
++async function expectPath(page: Page, path: string) {
++  await expect.poll(() => pathAndSearch(page)).toBe(path);
++}
++
++/** Vertical position of the first card's price label minus its <h2> (negative = label above). */
++async function firstCardLabelMinusH2(page: Page) {
++  const card = page.locator("article").first();
++  const label = await card.getByText("Everyday price", { exact: true }).boundingBox();
++  const h2 = await card.locator("h2").first().boundingBox();
++  if (!label || !h2) throw new Error("first card price label or <h2> not rendered");
++  return label.y - h2.y;
++}
++
++/** Records non-prefetch RSC requests (header `rsc: 1`, no `next-router-prefetch`). */
++function recordRscRequests(page: Page) {
++  const seen: string[] = [];
++  const pending: Promise<void>[] = [];
++  const onRequest = (req: Request) => {
++    pending.push(
++      req.allHeaders().then((h) => {
++        if (h["rsc"] === "1" && !("next-router-prefetch" in h)) seen.push(req.url());
++      }),
++    );
++  };
++  page.on("request", onRequest);
++  return {
++    async stop() {
++      page.off("request", onRequest);
++      await Promise.all(pending);
++      return seen;
++    },
++  };
++}
++
++/** Wraps history.replaceState/pushState before any app script runs, to record their URL args. */
++async function spyOnHistory(page: Page) {
++  await page.addInitScript(() => {
++    const w = window as unknown as { __qaReplace: string[]; __qaPush: string[] };
++    w.__qaReplace = [];
++    w.__qaPush = [];
++    const replace = history.replaceState.bind(history);
++    const push = history.pushState.bind(history);
++    history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
++      if (url != null) w.__qaReplace.push(String(url));
++      return replace(data, unused, url);
++    };
++    history.pushState = (data: unknown, unused: string, url?: string | URL | null) => {
++      if (url != null) w.__qaPush.push(String(url));
++      return push(data, unused, url);
++    };
++  });
++}
++
++async function resetHistorySpy(page: Page) {
++  await page.evaluate(() => {
++    const w = window as unknown as { __qaReplace: string[]; __qaPush: string[] };
++    w.__qaReplace = [];
++    w.__qaPush = [];
++  });
++}
++
++async function historySpy(page: Page) {
++  return page.evaluate(() => {
++    const w = window as unknown as { __qaReplace: string[]; __qaPush: string[] };
++    const norm = (s: string) => {
++      const u = new URL(s, location.href);
++      return u.pathname + u.search;
++    };
++    return { replace: w.__qaReplace.map(norm), push: w.__qaPush.map(norm) };
++  });
++}
++
++async function setMarker(page: Page) {
++  await page.evaluate(() => {
++    (window as unknown as { __qaMarker?: string }).__qaMarker = "still-here";
++  });
++}
++
++async function markerSurvives(page: Page) {
++  return page.evaluate(() => (window as unknown as { __qaMarker?: string }).__qaMarker === "still-here");
++}
++
++test("R13: this file runs in the JS-enabled chromium project", async ({}, testInfo) => {
++  expect(testInfo.project.name).toBe("chromium");
++  expect(testInfo.project.use.javaScriptEnabled).not.toBe(false);
++});
++
++test("R7: after hydration on / both options are <a> with role=button, aria-pressed and no aria-current", async ({
++  page,
++}) => {
++  const hydrationErrors: string[] = [];
++  page.on("console", (msg) => {
++    if (msg.type() === "error" && /hydrat|react error #(418|423|425)/i.test(msg.text())) hydrationErrors.push(msg.text());
++  });
++  page.on("pageerror", (err) => {
++    if (/hydrat|react error #(418|423|425)/i.test(err.message)) hydrationErrors.push(err.message);
++  });
++
++  await page.goto("/");
++  await waitForIsland(page);
++
++  const price = option(page, PRICE);
++  const specs = option(page, SPECS);
++  await expect(price).toHaveCount(1);
++  await expect(specs).toHaveCount(1);
++  await expect(price).toHaveAttribute("href", "/");
++  await expect(specs).toHaveAttribute("href", "/?layout=specs");
++  await expect(price).toHaveAttribute("role", "button");
++  await expect(specs).toHaveAttribute("role", "button");
++  await expect(price).toHaveAttribute("aria-pressed", "true");
++  await expect(specs).toHaveAttribute("aria-pressed", "false");
++  await expect(price).not.toHaveAttribute("aria-current");
++  await expect(specs).not.toHaveAttribute("aria-current");
++
++  await page.waitForLoadState("networkidle");
++  expect(hydrationErrors, "no hydration mismatch").toEqual([]);
++});
++
++test("R7: after hydration on /?layout=specs Specs first is pressed and Price first is not", async ({ page }) => {
++  await page.goto("/?layout=specs");
++  await waitForIsland(page);
++  await expect(option(page, PRICE)).toHaveAttribute("href", "/");
++  await expect(option(page, SPECS)).toHaveAttribute("href", "/?layout=specs");
++  await expect(option(page, PRICE)).toHaveAttribute("role", "button");
++  await expect(option(page, SPECS)).toHaveAttribute("role", "button");
++  await expectLayout(page, "specs");
++  await expect(option(page, PRICE)).not.toHaveAttribute("aria-current");
++  await expect(option(page, SPECS)).not.toHaveAttribute("aria-current");
++});
++
++test("R8: clicking Specs first switches the grid in place, moves the price below the <h2> and replaces the URL", async ({
++  page,
++}) => {
++  await spyOnHistory(page);
++  await page.goto("/");
++  await waitForIsland(page);
++  await page.waitForLoadState("networkidle");
++  await expectLayout(page, "price");
++  expect(await firstCardLabelMinusH2(page), "price label above <h2> in price layout").toBeLessThan(0);
++
++  const historyLength = await page.evaluate(() => history.length);
++  await setMarker(page);
++  await resetHistorySpy(page);
++  const rsc = recordRscRequests(page);
++
++  await option(page, SPECS).click();
++
++  await expectLayout(page, "specs");
++  await expectPath(page, "/?layout=specs");
++  await expect.poll(() => firstCardLabelMinusH2(page), { message: "price label below <h2> in specs layout" }).toBeGreaterThan(0);
++
++  await page.waitForTimeout(500);
++  expect(await markerSurvives(page), "no document load").toBe(true);
++  expect(await page.evaluate(() => history.length), "replaceState, not pushState").toBe(historyLength);
++  const spy = await historySpy(page);
++  expect(spy.replace, "history.replaceState called with hrefs.specs").toContain("/?layout=specs");
++  expect(spy.push, "no pushState").toEqual([]);
++  expect(await rsc.stop(), "no non-prefetch RSC request").toEqual([]);
++});
++
++test("R8: clicking Price first after Specs first reverses the switch and the URL becomes /", async ({ page }) => {
++  await spyOnHistory(page);
++  await page.goto("/");
++  await waitForIsland(page);
++  await page.waitForLoadState("networkidle");
++  await setMarker(page);
++  const rsc = recordRscRequests(page);
++
++  await option(page, SPECS).click();
++  await expectLayout(page, "specs");
++  await expectPath(page, "/?layout=specs");
++
++  await resetHistorySpy(page);
++  await option(page, PRICE).click();
++  await expectLayout(page, "price");
++  await expectPath(page, "/");
++  await expect.poll(() => firstCardLabelMinusH2(page), { message: "price label back above <h2>" }).toBeLessThan(0);
++
++  await page.waitForTimeout(500);
++  expect(await markerSurvives(page), "no document load").toBe(true);
++  const spy = await historySpy(page);
++  expect(spy.replace, "history.replaceState called with hrefs.price").toContain("/");
++  expect(spy.push, "no pushState").toEqual([]);
++  expect(await rsc.stop(), "no non-prefetch RSC request").toEqual([]);
++});
++
++test("R8: clicking the already-active option changes nothing", async ({ page }) => {
++  await page.goto("/");
++  await waitForIsland(page);
++  await page.waitForLoadState("networkidle");
++  await setMarker(page);
++  const rsc = recordRscRequests(page);
++
++  await option(page, PRICE).click();
++  await page.waitForTimeout(500);
++
++  await expectLayout(page, "price");
++  await expectPath(page, "/");
++  expect(await firstCardLabelMinusH2(page)).toBeLessThan(0);
++  expect(await markerSurvives(page), "no document load").toBe(true);
++  expect(await rsc.stop(), "no non-prefetch RSC request").toEqual([]);
++});
++
++test("R9: on /?q=washable toggling to specs gives /?q=washable&layout=specs", async ({ page }) => {
++  await page.goto("/?q=washable");
++  await waitForIsland(page);
++  await expect(option(page, SPECS)).toHaveAttribute("href", "/?q=washable&layout=specs");
++  await setMarker(page);
++
++  await option(page, SPECS).click();
++  await expectLayout(page, "specs");
++  await expectPath(page, "/?q=washable&layout=specs");
++  expect(await markerSurvives(page), "no document load").toBe(true);
++});
++
++test("R9: on /?category=bath toggling to specs gives /?category=bath&layout=specs", async ({ page }) => {
++  await page.goto("/?category=bath");
++  await waitForIsland(page);
++  await expect(option(page, SPECS)).toHaveAttribute("href", "/?category=bath&layout=specs");
++  await setMarker(page);
++
++  await option(page, SPECS).click();
++  await expectLayout(page, "specs");
++  await expectPath(page, "/?category=bath&layout=specs");
++  expect(await markerSurvives(page), "no document load").toBe(true);
++});
++
++test("R10: after toggling to specs on /, following the Bath chip lands on /?category=bath with the price layout", async ({
++  page,
++}) => {
++  await page.goto("/");
++  await waitForIsland(page);
++  await option(page, SPECS).click();
++  await expectLayout(page, "specs");
++  await expectPath(page, "/?layout=specs");
++
++  await page.getByRole("link", { name: "Bath", exact: true }).click();
++  await expectPath(page, "/?category=bath");
++  await expect(page.locator("article")).toHaveCount(2);
++  await expectLayout(page, "price");
++});
++
++test("R10: after toggling to price on /?layout=specs, following the Bath chip lands on its specs URL with the specs layout", async ({
++  page,
++}) => {
++  await page.goto("/?layout=specs");
++  await waitForIsland(page);
++  await option(page, PRICE).click();
++  await expectLayout(page, "price");
++  await expectPath(page, "/");
++
++  // The chip keeps its server href from before the toggle (spec Contract decisions).
++  await page.getByRole("link", { name: "Bath", exact: true }).click();
++  await expectPath(page, "/?category=bath&layout=specs");
++  await expect(page.locator("article")).toHaveCount(2);
++  await expectLayout(page, "specs");
++});
+diff --git a/playwright.config.ts b/playwright.config.ts
+index 3535206..6b93fa8 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -1,34 +1,46 @@
+-// End-to-end checks (Playwright, JS enabled). Starts its own `npm start` against the
+-// already-built app with mock data forced, the same env pattern as scripts/verify-ssr.sh
+-// (D-021, architecture.md Tests): CONTENTFUL_* blanked, own SESSION_SECRET.
++// End-to-end checks (Playwright). Starts its own `npm start` against the already-built
++// app with mock data forced, the same env pattern as scripts/verify-ssr.sh (D-021,
++// architecture.md Tests): CONTENTFUL_* blanked, own SESSION_SECRET.
+ //
+-// The no-JS project (D-009) arrives with the P05 layout-toggle island (qa.md R18/spec
+-// "Out of scope"); until then this file has a single JS-enabled project.
++// P05 R13 (D-009): two projects, scoped by file name.
++//   chromium        JS enabled, runs every spec except `*.nojs.spec.ts`
++//   chromium-no-js  javaScriptEnabled: false, runs only `*.nojs.spec.ts`
+ import { defineConfig, devices } from "@playwright/test";
+ 
+ const PORT = process.env.PLAYWRIGHT_PORT ?? "3220";
+ const BASE_URL = `http://127.0.0.1:${PORT}`;
+ 
+ export default defineConfig({
+   testDir: "./e2e",
+   fullyParallel: true,
+   forbidOnly: !!process.env.CI,
+   retries: process.env.CI ? 2 : 0,
+   reporter: "list",
+   use: {
+     baseURL: BASE_URL,
+   },
+-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
++  projects: [
++    {
++      name: "chromium",
++      testIgnore: /\.nojs\.spec\.ts$/,
++      use: { ...devices["Desktop Chrome"] },
++    },
++    {
++      name: "chromium-no-js",
++      testMatch: /\.nojs\.spec\.ts$/,
++      use: { ...devices["Desktop Chrome"], javaScriptEnabled: false },
++    },
++  ],
+   webServer: {
+     command: `npm start -- --port ${PORT}`,
+     url: BASE_URL,
+     reuseExistingServer: false,
+     timeout: 120_000,
+     env: {
+       CONTENTFUL_SPACE_ID: "",
+       CONTENTFUL_ENVIRONMENT: "",
+       CONTENTFUL_DELIVERY_TOKEN: "",
+       SESSION_SECRET: "playwright-e2e-session-secret-at-least-32-chars-long",
+     },
+   },
+ });
+diff --git a/scripts/verify-ssr.sh b/scripts/verify-ssr.sh
+index 8dfaa22..1210ca6 100755
+--- a/scripts/verify-ssr.sh
++++ b/scripts/verify-ssr.sh
+@@ -1,18 +1,19 @@
+ #!/usr/bin/env bash
+ # SSR checks for the catalog (P03: R7, R13, R15-R23). Later phases extend this file.
+ # P04 additions: product detail (R1-R11), login (R12-R15) and route-level not-found (R2, R16).
++# P05 additions: layout toggle island (P05 R3, R5, R6; R14 via the R18 loop).
+ #
+ # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
+ # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
+ # as empty strings, D-021) and its own SESSION_SECRET, fetches pages with curl
+ # (no redirects followed), and asserts on the initial HTML. It mints its own
+ # session cookie with node + jose, so it never depends on the login UI.
+ #
+ # Prints one PASS/FAIL line per assertion and exits non-zero on any failure.
+ set -euo pipefail
+ 
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ cd "$ROOT"
+ 
+ # --- Environment (D-021, architecture.md Tests) -----------------------------
+ export CONTENTFUL_SPACE_ID=""
+@@ -110,30 +111,72 @@ no_tag() { [ "$(tag_count "$@")" -eq 0 ]; }
+ 
+ # First occurrences of each string appear, in the given order.
+ cat >"$WORK/order.mjs" <<'JS'
+ import { readFileSync } from "node:fs";
+ const [file, ...needles] = process.argv.slice(2);
+ const html = readFileSync(file, "utf8");
+ let last = -1;
+ for (const n of needles) {
+   const i = html.indexOf(n);
+   if (i === -1 || i <= last) process.exit(1);
+   last = i;
+ }
+ JS
+ in_order() { node "$WORK/order.mjs" "$@"; }
+ 
++# P05: the layout option anchors. Prints one line per <a> whose text (tags stripped,
++# trimmed) equals TEXT: "href=<v>|aria-current=<v>|aria-pressed=<v>|role=<v>" with each
++# value in its HTML-escaped form, "-" when the attribute is absent.
++cat >"$WORK/anchors.mjs" <<'JS'
++import { readFileSync } from "node:fs";
++const [file, text] = process.argv.slice(2);
++const html = readFileSync(file, "utf8");
++const out = [];
++for (const m of html.matchAll(/<a(\s[^>]*)?>([\s\S]*?)<\/a>/g)) {
++  if (m[2].replace(/<[^>]*>/g, "").trim() !== text) continue;
++  const attrs = new Map();
++  for (const a of (m[1] ?? "").matchAll(/([^\s"'=<>\/]+)(?:\s*=\s*"([^"]*)")?/g)) attrs.set(a[1], a[2] ?? "");
++  const v = (k) => (attrs.has(k) ? attrs.get(k) : "-");
++  out.push(`href=${v("href")}|aria-current=${v("aria-current")}|aria-pressed=${v("aria-pressed")}|role=${v("role")}`);
++}
++process.stdout.write(out.join("\n"));
++JS
++anchors() { node "$WORK/anchors.mjs" "$@"; }
++# option_is FILE TEXT EXPECTED_LINE: exactly one such <a>, with exactly these attributes.
++option_is() { [ "$(anchors "$1" "$2")" = "$3" ]; }
++
++# P05 R3/R6: every element carrying data-layout. Prints "<tag>|<data-layout>|<has group class>"
++# per element, one per line.
++cat >"$WORK/layout.mjs" <<'JS'
++import { readFileSync } from "node:fs";
++const [file] = process.argv.slice(2);
++const html = readFileSync(file, "utf8");
++const out = [];
++for (const m of html.matchAll(/<([a-zA-Z][a-zA-Z0-9-]*)(\s[^>]*)>/g)) {
++  const attrs = new Map();
++  for (const a of m[2].matchAll(/([^\s"'=<>\/]+)(?:\s*=\s*"([^"]*)")?/g)) attrs.set(a[1], a[2] ?? "");
++  if (!attrs.has("data-layout")) continue;
++  const group = (attrs.get("class") ?? "").split(/\s+/).includes("group");
++  out.push(`${m[1]}|${attrs.get("data-layout")}|${group ? "group" : "no-group"}`);
++}
++process.stdout.write(out.join("\n"));
++JS
++layout_wrappers() { node "$WORK/layout.mjs" "$@"; }
++# layout_wrapper_is FILE VALUE: exactly one data-layout element, a <div class="group ..."> with that value.
++layout_wrapper_is() { [ "$(layout_wrappers "$1")" = "div|$2|group" ]; }
++layout_wrapper_any() { local w; w="$(layout_wrappers "$1")"; [ "$w" = "div|price|group" ] || [ "$w" = "div|specs|group" ]; }
++
+ # Trimmed text content of the first <h1>...</h1> (tags inside, if any, stripped).
+ cat >"$WORK/h1.mjs" <<'JS'
+ import { readFileSync } from "node:fs";
+ const [file] = process.argv.slice(2);
+ const html = readFileSync(file, "utf8");
+ const m = html.match(/<h1(?:\s[^>]*)?>([\s\S]*?)<\/h1>/);
+ process.stdout.write(m ? m[1].replace(/<[^>]*>/g, "").trim() : "");
+ JS
+ h1_text() { node "$WORK/h1.mjs" "$@"; }
+ h1_text_is() { [ "$(h1_text "$1")" = "$2" ]; }
+ 
+ # fetch_page NAME PATH [COOKIE]: body to $WORK/NAME.html, status to $WORK/NAME.html.status,
+ # response headers (for redirect checks, P04 R3/R12) to $WORK/NAME.html.headers.
+ FETCHED=""
+ fetch_page() {
+@@ -225,30 +268,33 @@ BAD_COOKIE="session=not-a-jwt"
+ 
+ # --- Fetch ------------------------------------------------------------------
+ fetch_page anon "/"
+ fetch_page member "/" "$GOOD_COOKIE"
+ fetch_page badcookie "/" "$BAD_COOKIE"
+ fetch_page bath "/?category=bath"
+ fetch_page washable "/?q=washable"
+ fetch_page washable_member "/?q=washable" "$GOOD_COOKIE"
+ fetch_page activity "/?category=activity-sensory"
+ fetch_page activity_member "/?category=activity-sensory" "$GOOD_COOKIE"
+ fetch_page zzz "/?q=zzz"
+ fetch_page robots_bogus "/?category=robots&layout=bogus"
+ fetch_page specs "/?layout=specs"
+ fetch_page washable_specs "/?q=washable&layout=specs"
+ fetch_page bath_specs "/?category=bath&layout=specs"
++# P05
++fetch_page bogus "/?layout=bogus"
++fetch_page specs_member "/?layout=specs" "$GOOD_COOKIE"
+ 
+ # Catalog-only pages, for the R20 "every catalog link keeps state" loop below: P04 adds
+ # non-catalog pages (detail, login, not-found) to $FETCHED for the R18 streaming check,
+ # but those never render the catalog's Clear-filters link or filter chips.
+ CATALOG_FETCHED="$FETCHED"
+ 
+ # P04: product detail, login, not-found
+ fetch_page detail_cbp_anon "/products/cloud-bunny-plush"
+ fetch_page detail_cbp_member "/products/cloud-bunny-plush" "$GOOD_COOKIE"
+ fetch_page detail_ffac_anon "/products/forest-friends-activity-cube"
+ fetch_page detail_ffac_member "/products/forest-friends-activity-cube" "$GOOD_COOKIE"
+ fetch_page detail_bbw_anon "/products/bubble-bath-whale"
+ fetch_page detail_unknown "/products/no-such-toy"
+ fetch_page detail_badslug "/products/Not-Valid-Slug"
+ fetch_page login_anon "/login"
+@@ -525,23 +571,97 @@ P="$(page login_anon)"
+ check "R14: no hidden next input when next is missing" no_tag "$P" input 'name=next'
+ 
+ # --- R15: /login?error=missing alert ----------------------------------------
+ P="$(page login_error_missing)"
+ check "R15: GET /login?error=missing status 200" status_is "$P" 200
+ check "R15: exactly one role=\"alert\" element" tag_count_is "$P" 1 '*' 'role=alert'
+ check "R15: alert text 'Enter a username and password to sign in.'" has "$P" "Enter a username and password to sign in."
+ check "R15: alert is positioned above the username field" in_order "$P" "Enter a username and password to sign in." 'name="username"'
+ 
+ P="$(page login_anon)"
+ check "R15: /login (no error param) has no role=\"alert\"" lacks "$P" 'role="alert"'
+ 
+ P="$(page login_error_bogus)"
+ check "R15: /login?error=bogus has no role=\"alert\"" lacks "$P" 'role="alert"'
+ 
++# =====================================================================
++# P05: layout toggle island (server HTML for no-JS clients)
++# =====================================================================
++
++# --- R5: layout options are two plain links in the server HTML -------------
++# NAME | expected Price first href | expected Specs first href | active layout
++# (hrefs in their HTML-escaped form, as catalogHref renders them: category, q, layout).
++P05_OPTIONS=(
++  "anon|/|/?layout=specs|price"
++  "member|/|/?layout=specs|price"
++  "badcookie|/|/?layout=specs|price"
++  "bath|/?category=bath|/?category=bath&amp;layout=specs|price"
++  "washable|/?q=washable|/?q=washable&amp;layout=specs|price"
++  "washable_member|/?q=washable|/?q=washable&amp;layout=specs|price"
++  "activity|/?category=activity-sensory|/?category=activity-sensory&amp;layout=specs|price"
++  "activity_member|/?category=activity-sensory|/?category=activity-sensory&amp;layout=specs|price"
++  "zzz|/?q=zzz|/?q=zzz&amp;layout=specs|price"
++  "robots_bogus|/|/?layout=specs|price"
++  "specs|/|/?layout=specs|specs"
++  "washable_specs|/?q=washable|/?q=washable&amp;layout=specs|specs"
++  "bath_specs|/?category=bath|/?category=bath&amp;layout=specs|specs"
++  "bogus|/|/?layout=specs|price"
++  "specs_member|/|/?layout=specs|specs"
++)
++for row in "${P05_OPTIONS[@]}"; do
++  IFS='|' read -r name price_href specs_href active <<<"$row"
++  P="$(page "$name")"
++  if [ "$active" = "price" ]; then pc="true"; sc="-"; else pc="-"; sc="true"; fi
++  check "R5: [$name] status 200" status_is "$P" 200
++  check "R5: [$name] one <a>Price first</a>, href=$price_href, aria-current=$pc, no aria-pressed, no role" \
++    option_is "$P" "Price first" "href=$price_href|aria-current=$pc|aria-pressed=-|role=-"
++  check "R5: [$name] one <a>Specs first</a>, href=$specs_href, aria-current=$sc, no aria-pressed, no role" \
++    option_is "$P" "Specs first" "href=$specs_href|aria-current=$sc|aria-pressed=-|role=-"
++  check "R5: [$name] no 'aria-pressed' anywhere in the server HTML" lacks "$P" "aria-pressed"
++  check "R5: [$name] no 'role=\"button\"' anywhere in the server HTML" lacks "$P" 'role="button"'
++done
++
++# --- R6 / R3: exactly one data-layout, on the grid wrapper <div class="group ..."> ---
++# NAME | expected data-layout
++P05_LAYOUTS=(
++  "anon|price"
++  "specs|specs"
++  "bogus|price"
++  "specs_member|specs"
++)
++for row in "${P05_LAYOUTS[@]}"; do
++  IFS='|' read -r name want <<<"$row"
++  P="$(page "$name")"
++  check "R6: [$name] 'data-layout=' occurs exactly once" count_is "$P" "data-layout=" 1
++  check "R6: [$name] data-layout=\"$want\" occurs exactly once" count_is "$P" "data-layout=\"$want\"" 1
++  check "R3: [$name] the data-layout element is a <div> with class 'group', data-layout=$want" layout_wrapper_is "$P" "$want"
++done
++for name in bath washable washable_member robots_bogus washable_specs bath_specs member badcookie activity_member; do
++  check "R3: [$name] exactly one data-layout element, a <div> with class 'group'" layout_wrapper_any "$(page "$name")"
++done
++
++# --- R3: empty state still renders no data-layout (P03 R19d) ---------------
++for name in activity zzz; do
++  check "R3: [$name] empty state has no 'data-layout='" lacks "$(page "$name")" "data-layout="
++done
++
++# --- R6: logged in /?layout=specs keeps all Set B / member-price checks ------
++P="$(page specs_member)"
++check "R6: /?layout=specs logged in status 200" status_is "$P" 200
++for n in "${ALL_NAMES_IN_ORDER[@]}"; do check "R6: /?layout=specs logged in contains '$n'" has "$P" "$n"; done
++for p in "${MEMBER_PRICES[@]}"; do check "R6: /?layout=specs logged in contains member price $p" has "$P" "$p"; done
++for p in "${PUBLIC_EVERYDAY[@]}" "${AUTH_EVERYDAY[@]}"; do check "R6: /?layout=specs logged in lacks everyday price $p" lacks "$P" "$p"; done
++
++# --- R6: logged out /?layout=specs still has no Set B and no member prices ---
++P="$(page specs)"
++for n in "${AUTH_NAMES[@]}"; do check "R6: /?layout=specs logged out lacks authenticated name '$n'" lacks "$P" "$n"; done
++for p in "${MEMBER_PRICES[@]}"; do check "R6: /?layout=specs logged out lacks member price $p" lacks "$P" "$p"; done
++for p in "${PUBLIC_EVERYDAY[@]}"; do check "R6: /?layout=specs logged out contains everyday price $p" has "$P" "$p"; done
++
+ # --- Summary ----------------------------------------------------------------
+ echo
+ echo "verify-ssr: $PASS_COUNT passed, $FAIL_COUNT failed"
+ if [ "$FAIL_COUNT" -ne 0 ]; then
+   echo "verify-ssr: FAIL"
+   exit 1
+ fi
+ echo "verify-ssr: PASS"
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+index 65b4f40..79847f5 100644
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -1,35 +1,38 @@
+ import { Banner } from "@/components/banner";
+ import { parseCatalogParams } from "@/components/catalog-params";
++import { LayoutProvider } from "@/components/client/layout-toggle";
+ import { EmptyState } from "@/components/empty-state";
+ import { FilterCard } from "@/components/filter-card";
+ import { LOGGED_OUT_BANNER_TEXT, memberBannerText } from "@/components/format";
+ import { ProductGrid } from "@/components/product-grid";
+ import { SiteHeader } from "@/components/site-header";
+ import { TitleArea } from "@/components/title-area";
+ import { CONTAINER } from "@/components/ui-classes";
+ import { getProducts, verifySession } from "@/lib/dal";
+ import { filterProducts } from "@/lib/products/filter";
+ 
+ // Render fully on the server per request: prices and Set B are in the initial HTML (D-020).
+ export const instant = false;
+ 
+ export default async function CatalogPage(props: PageProps<"/">) {
+   const params = parseCatalogParams(await props.searchParams);
+   const [session, products] = await Promise.all([verifySession(), getProducts()]);
+   const visible = filterProducts(products, { category: params.category, q: params.q });
+   const membersOnlyCount = products.filter((p) => p.visibility === "authenticated").length;
+ 
+   return (
+     <>
+       <SiteHeader variant="session" />
+       <main className="flex-1">
+         <Banner text={session !== null ? memberBannerText(membersOnlyCount) : LOGGED_OUT_BANNER_TEXT} />
+         <TitleArea />
+         <div className={`${CONTAINER} flex flex-col gap-10`}>
+-          <FilterCard params={params} count={visible.length} />
+-          {visible.length > 0 ? <ProductGrid products={visible} layout={params.layout} /> : <EmptyState q={params.q} />}
++          <LayoutProvider layout={params.layout}>
++            <FilterCard params={params} count={visible.length} />
++            {visible.length > 0 ? <ProductGrid products={visible} /> : <EmptyState q={params.q} />}
++          </LayoutProvider>
+         </div>
+       </main>
+     </>
+   );
+ }
+diff --git a/src/components/client/layout-toggle.tsx b/src/components/client/layout-toggle.tsx
+new file mode 100644
+index 0000000..31a73f8
+--- /dev/null
++++ b/src/components/client/layout-toggle.tsx
+@@ -0,0 +1,100 @@
++"use client";
++
++import Link from "next/link";
++import { useSearchParams } from "next/navigation";
++import { createContext, use, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
++
++import { parseCatalogParams, type CatalogLayout } from "@/components/catalog-params";
++
++// UI state only (D-019): the current layout. Cards, prices and Set B arrive as server `children`.
++const LayoutContext = createContext<CatalogLayout | null>(null);
++
++const OPTIONS: { value: CatalogLayout; label: string }[] = [
++  { value: "price", label: "Price first" },
++  { value: "specs", label: "Specs first" },
++];
++
++const noopSubscribe = () => () => {};
++
++/** false in the server render and during hydration, true once mounted (no hydration mismatch). */
++function useMounted(): boolean {
++  return useSyncExternalStore(
++    noopSubscribe,
++    () => true,
++    () => false,
++  );
++}
++
++function useCurrentLayout(): CatalogLayout {
++  const layout = use(LayoutContext);
++  if (layout === null) throw new Error("LayoutGrid / LayoutToggle must be inside a LayoutProvider");
++  return layout;
++}
++
++/**
++ * Holds the current layout for the subtree. Renders no DOM element of its own.
++ * The URL is the source of truth (R10): Next syncs `history.replaceState` with
++ * `useSearchParams`, so a toggle and any later navigation both update it. The
++ * server-validated `layout` prop is only the fallback when no search params exist.
++ */
++export function LayoutProvider({ layout, children }: { layout: CatalogLayout; children: ReactNode }) {
++  const searchParams = useSearchParams();
++  const current = searchParams ? parseCatalogParams({ layout: searchParams.get("layout") ?? undefined }).layout : layout;
++  return <LayoutContext value={current}>{children}</LayoutContext>;
++}
++
++/** The grid wrapper: `group` + `data-layout` drive the `group-data-[layout=specs]:` utilities. */
++export function LayoutGrid({ children }: { children: ReactNode }) {
++  const current = useCurrentLayout();
++  return (
++    <div data-layout={current} className="group">
++      {children}
++    </div>
++  );
++}
++
++function isPlainLeftClick(event: MouseEvent<HTMLAnchorElement>): boolean {
++  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
++}
++
++/**
++ * Segmented control. Server HTML: two links with `aria-current` (works without JS).
++ * After mount: the same links with `role="button"` + `aria-pressed`; a plain left
++ * click switches in place and replaces the URL, with no navigation and no refetch.
++ */
++export function LayoutToggle({ hrefs }: { hrefs: Record<CatalogLayout, string> }) {
++  const current = useCurrentLayout();
++  const mounted = useMounted();
++
++  function onClick(event: MouseEvent<HTMLAnchorElement>, next: CatalogLayout) {
++    if (!isPlainLeftClick(event)) return;
++    event.preventDefault();
++    if (next === current) return;
++    window.history.replaceState(null, "", hrefs[next]);
++  }
++
++  return (
++    <>
++      {OPTIONS.map((option) => {
++        const active = option.value === current;
++        const state = mounted
++          ? { role: "button" as const, "aria-pressed": active }
++          : { "aria-current": active ? ("true" as const) : undefined };
++        return (
++          <Link
++            key={option.value}
++            href={hrefs[option.value]}
++            prefetch={false}
++            onClick={(event) => onClick(event, option.value)}
++            {...state}
++            className={`inline-flex min-h-12 items-center rounded-full border-2 px-4 text-sm font-bold ${
++              active ? "border-foreground bg-card shadow-pop" : "border-transparent text-muted-foreground"
++            }`}
++          >
++            {option.label}
++          </Link>
++        );
++      })}
++    </>
++  );
++}
+diff --git a/src/components/filter-card.tsx b/src/components/filter-card.tsx
+index ded86e0..a729938 100644
+--- a/src/components/filter-card.tsx
++++ b/src/components/filter-card.tsx
+@@ -1,34 +1,30 @@
+ import { Search } from "lucide-react";
+ import Form from "next/form";
+ import Link from "next/link";
+ 
+-import { catalogHref, type CatalogLayout, type CatalogParams } from "@/components/catalog-params";
++import { catalogHref, type CatalogParams } from "@/components/catalog-params";
+ import { CATEGORY_META } from "@/components/categories";
++import { LayoutToggle } from "@/components/client/layout-toggle";
+ import { formatToyCount } from "@/components/format";
+ import { BUTTON_PRIMARY, BUTTON_SECONDARY, CARD_BASE, COLOR_CLASSES, LABEL } from "@/components/ui-classes";
+ import { CATEGORIES, type Category } from "@/schemas/product";
+ 
+ const CHIP =
+   "inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-foreground px-4 text-sm font-bold";
+ 
+-const LAYOUT_OPTIONS: { value: CatalogLayout; label: string }[] = [
+-  { value: "price", label: "Price first" },
+-  { value: "specs", label: "Specs first" },
+-];
+-
+-/** Search (GET form), category chips, layout links, count and Clear filters. Works without JS. */
++/** Search (GET form), category chips, layout toggle (island; real links without JS), count and Clear filters. Works without JS. */
+ export function FilterCard({ params, count }: { params: CatalogParams; count: number }) {
+   const { category, q, layout } = params;
+ 
+   return (
+     <section aria-label="Filters" className={`${CARD_BASE} sticker flex flex-col gap-5 p-4 md:p-6`}>
+       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+         <Form action="/" className="flex flex-1 flex-col gap-2 md:max-w-xl">
+           <label htmlFor="catalog-search" className={LABEL}>
+             Search
+           </label>
+           <div className="flex flex-col gap-3 sm:flex-row">
+             <input
+               id="catalog-search"
+               type="search"
+               name="q"
+@@ -42,45 +38,36 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
+               <Search aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
+               Search
+             </button>
+           </div>
+         </Form>
+ 
+         <div className="flex flex-col gap-2">
+           <p id="layout-label" className={LABEL}>
+             Layout
+           </p>
+           <div
+             role="group"
+             aria-labelledby="layout-label"
+             className="inline-flex w-fit gap-1 rounded-full border-2 border-foreground bg-muted p-1"
+           >
+-            {LAYOUT_OPTIONS.map((option) => {
+-              const active = option.value === layout;
+-              return (
+-                <Link
+-                  key={option.value}
+-                  href={catalogHref({ category, q, layout: option.value })}
+-                  aria-current={active ? "true" : undefined}
+-                  className={`inline-flex min-h-12 items-center rounded-full border-2 px-4 text-sm font-bold ${
+-                    active ? "border-foreground bg-card shadow-pop" : "border-transparent text-muted-foreground"
+-                  }`}
+-                >
+-                  {option.label}
+-                </Link>
+-              );
+-            })}
++            <LayoutToggle
++              hrefs={{
++                price: catalogHref({ category, q, layout: "price" }),
++                specs: catalogHref({ category, q, layout: "specs" }),
++              }}
++            />
+           </div>
+         </div>
+       </div>
+ 
+       <nav aria-label="Categories">
+         <ul className="flex flex-wrap gap-2">
+           <li>
+             <CategoryChip label="All" href={catalogHref({ category: null, q, layout })} active={category === null} />
+           </li>
+           {CATEGORIES.map((value) => (
+             <li key={value}>
+               <CategoryChip
+                 category={value}
+                 label={CATEGORY_META[value].label}
+                 href={catalogHref({ category: value, q, layout })}
+diff --git a/src/components/product-grid.tsx b/src/components/product-grid.tsx
+index 719442f..b944a69 100644
+--- a/src/components/product-grid.tsx
++++ b/src/components/product-grid.tsx
+@@ -1,19 +1,20 @@
+-import type { CatalogLayout } from "@/components/catalog-params";
++import { LayoutGrid } from "@/components/client/layout-toggle";
+ import { ProductCard } from "@/components/product-card";
+ import type { CatalogProduct } from "@/lib/products/types";
+ 
+ /**
+- * The wrapper carries `group` and `data-layout` (the P05 island flips it); the grid and the
+- * cards inside switch columns, orientation and spec blocks with group-data utilities.
++ * The wrapper is the island's <LayoutGrid> (`group` + `data-layout`, flipped client-side); the
++ * grid and the server-rendered cards inside switch columns, orientation and spec blocks with
++ * group-data utilities. Must be inside a <LayoutProvider>.
+  */
+-export function ProductGrid({ products, layout }: { products: CatalogProduct[]; layout: CatalogLayout }) {
++export function ProductGrid({ products }: { products: CatalogProduct[] }) {
+   return (
+-    <div data-layout={layout} className="group">
++    <LayoutGrid>
+       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 group-data-[layout=specs]:sm:grid-cols-1 group-data-[layout=specs]:md:grid-cols-2 group-data-[layout=specs]:lg:grid-cols-2 group-data-[layout=specs]:xl:grid-cols-2">
+         {products.map((product, index) => (
+           <ProductCard key={product.id} product={product} index={index} />
+         ))}
+       </div>
+-    </div>
++    </LayoutGrid>
+   );
+ }

@@ -1,5 +1,6 @@
 import { Banner } from "@/components/banner";
 import { parseCatalogParams } from "@/components/catalog-params";
+import { LayoutProvider } from "@/components/client/layout-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { FilterCard } from "@/components/filter-card";
 import { LOGGED_OUT_BANNER_TEXT, memberBannerText } from "@/components/format";
@@ -26,8 +27,10 @@ export default async function CatalogPage(props: PageProps<"/">) {
         <Banner text={session !== null ? memberBannerText(membersOnlyCount) : LOGGED_OUT_BANNER_TEXT} />
         <TitleArea />
         <div className={`${CONTAINER} flex flex-col gap-10`}>
-          <FilterCard params={params} count={visible.length} />
-          {visible.length > 0 ? <ProductGrid products={visible} layout={params.layout} /> : <EmptyState q={params.q} />}
+          <LayoutProvider layout={params.layout}>
+            <FilterCard params={params} count={visible.length} />
+            {visible.length > 0 ? <ProductGrid products={visible} /> : <EmptyState q={params.q} />}
+          </LayoutProvider>
         </div>
       </main>
     </>

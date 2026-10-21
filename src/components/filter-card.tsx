@@ -2,8 +2,9 @@ import { Search } from "lucide-react";
 import Form from "next/form";
 import Link from "next/link";
 
-import { catalogHref, type CatalogLayout, type CatalogParams } from "@/components/catalog-params";
+import { catalogHref, type CatalogParams } from "@/components/catalog-params";
 import { CATEGORY_META } from "@/components/categories";
+import { LayoutToggle } from "@/components/client/layout-toggle";
 import { formatToyCount } from "@/components/format";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, CARD_BASE, COLOR_CLASSES, LABEL } from "@/components/ui-classes";
 import { CATEGORIES, type Category } from "@/schemas/product";
@@ -11,12 +12,7 @@ import { CATEGORIES, type Category } from "@/schemas/product";
 const CHIP =
   "inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-foreground px-4 text-sm font-bold";
 
-const LAYOUT_OPTIONS: { value: CatalogLayout; label: string }[] = [
-  { value: "price", label: "Price first" },
-  { value: "specs", label: "Specs first" },
-];
-
-/** Search (GET form), category chips, layout links, count and Clear filters. Works without JS. */
+/** Search (GET form), category chips, layout toggle (island; real links without JS), count and Clear filters. Works without JS. */
 export function FilterCard({ params, count }: { params: CatalogParams; count: number }) {
   const { category, q, layout } = params;
 
@@ -54,21 +50,12 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
             aria-labelledby="layout-label"
             className="inline-flex w-fit gap-1 rounded-full border-2 border-foreground bg-muted p-1"
           >
-            {LAYOUT_OPTIONS.map((option) => {
-              const active = option.value === layout;
-              return (
-                <Link
-                  key={option.value}
-                  href={catalogHref({ category, q, layout: option.value })}
-                  aria-current={active ? "true" : undefined}
-                  className={`inline-flex min-h-12 items-center rounded-full border-2 px-4 text-sm font-bold ${
-                    active ? "border-foreground bg-card shadow-pop" : "border-transparent text-muted-foreground"
-                  }`}
-                >
-                  {option.label}
-                </Link>
-              );
-            })}
+            <LayoutToggle
+              hrefs={{
+                price: catalogHref({ category, q, layout: "price" }),
+                specs: catalogHref({ category, q, layout: "specs" }),
+              }}
+            />
           </div>
         </div>
       </div>

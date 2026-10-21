@@ -86,3 +86,17 @@ Append-only. Every "Where the instructions got in the way" item from each phase,
 | ui | `docs/architecture.md` and `agents/ui.md` still say `instant = false` makes this route render fully on the server (human follow-up, not edited) |
 | qa | Round 3 post-build: `e2e/login.spec.ts:22` URL regex has no start anchor and also matches `/login?next=…`; left as is (locked) |
 | orchestrator | **Escalation (round 3 of 3):** R17 fails. Recorded as OI-1 in `handoffs/OPEN-ISSUES.md`. Reviewer not dispatched, because the round limit had already decided the outcome. Phase committed as `wip` under the batch-run override |
+
+## Phase 05: layout toggle (batch run)
+
+| Agent | Item |
+|---|---|
+| orchestrator | architecture.md says the island flips `data-layout` on the grid wrapper and gets "the current layout and server-rendered `children`", but the control (filter card) and the grid are in different subtrees and the empty state must carry no `data-layout`. Spec resolved it with `LayoutProvider` + `LayoutGrid` + `LayoutToggle` |
+| orchestrator | architecture.md / design.md don't say what happens to chips, the search form's hidden `layout` input and Clear filters after a client-side toggle; they keep their pre-toggle hrefs. Spec made the URL the island's source of truth and recorded the limitation for the human |
+| orchestrator | design.md names both `aria-pressed` (island) and `aria-current` (links); spec keeps `aria-current` in the server HTML and switches to `role="button"` + `aria-pressed` after mount |
+| orchestrator | `npm run test:e2e` exits non-zero while OI-1 is open; the spec named `e2e/login.spec.ts` R17 as the only allowed failure. The procedure has no notion of a known-failing check |
+| qa | R5 "every catalog URL" had no explicit list; qa included the empty-state URLs after confirming the toggle renders there |
+| qa | R6 "all Set B / member-price checks as in P03" reused the P03 R15/R16 set |
+| qa | Pre-build: ran `pkill -f next-server` during a manual curl check, which would also stop a human's dev server. No role file says not to |
+| ui | `useSearchParams` builds without `<Suspense>` only because `/` is dynamic (`instant = false`); if `/` ever became prerenderable, Next would demand a boundary (D-020 forbids it) |
+| reviewer | The diff can't show command output (boundary script, `ƒ` marker) or runtime behaviour; passed on code evidence plus qa's checks. Notes: the `layout` prop is effectively unused (URL always wins); repeated `?layout=` edge case unprobed; `<a role="button">` activates on Enter only |

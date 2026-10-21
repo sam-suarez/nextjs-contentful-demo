@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SSR checks for the catalog (P03: R7, R13, R15-R23). Later phases extend this file.
 # P04 additions: product detail (R1-R11), login (R12-R15) and route-level not-found (R2, R16).
+# P05 additions: layout toggle island (P05 R3, R5, R6; R14 via the R18 loop).
 #
 # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
 # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
@@ -122,6 +123,48 @@ for (const n of needles) {
 JS
 in_order() { node "$WORK/order.mjs" "$@"; }
 
+# P05: the layout option anchors. Prints one line per <a> whose text (tags stripped,
+# trimmed) equals TEXT: "href=<v>|aria-current=<v>|aria-pressed=<v>|role=<v>" with each
+# value in its HTML-escaped form, "-" when the attribute is absent.
+cat >"$WORK/anchors.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [file, text] = process.argv.slice(2);
+const html = readFileSync(file, "utf8");
+const out = [];
+for (const m of html.matchAll(/<a(\s[^>]*)?>([\s\S]*?)<\/a>/g)) {
+  if (m[2].replace(/<[^>]*>/g, "").trim() !== text) continue;
+  const attrs = new Map();
+  for (const a of (m[1] ?? "").matchAll(/([^\s"'=<>\/]+)(?:\s*=\s*"([^"]*)")?/g)) attrs.set(a[1], a[2] ?? "");
+  const v = (k) => (attrs.has(k) ? attrs.get(k) : "-");
+  out.push(`href=${v("href")}|aria-current=${v("aria-current")}|aria-pressed=${v("aria-pressed")}|role=${v("role")}`);
+}
+process.stdout.write(out.join("\n"));
+JS
+anchors() { node "$WORK/anchors.mjs" "$@"; }
+# option_is FILE TEXT EXPECTED_LINE: exactly one such <a>, with exactly these attributes.
+option_is() { [ "$(anchors "$1" "$2")" = "$3" ]; }
+
+# P05 R3/R6: every element carrying data-layout. Prints "<tag>|<data-layout>|<has group class>"
+# per element, one per line.
+cat >"$WORK/layout.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [file] = process.argv.slice(2);
+const html = readFileSync(file, "utf8");
+const out = [];
+for (const m of html.matchAll(/<([a-zA-Z][a-zA-Z0-9-]*)(\s[^>]*)>/g)) {
+  const attrs = new Map();
+  for (const a of m[2].matchAll(/([^\s"'=<>\/]+)(?:\s*=\s*"([^"]*)")?/g)) attrs.set(a[1], a[2] ?? "");
+  if (!attrs.has("data-layout")) continue;
+  const group = (attrs.get("class") ?? "").split(/\s+/).includes("group");
+  out.push(`${m[1]}|${attrs.get("data-layout")}|${group ? "group" : "no-group"}`);
+}
+process.stdout.write(out.join("\n"));
+JS
+layout_wrappers() { node "$WORK/layout.mjs" "$@"; }
+# layout_wrapper_is FILE VALUE: exactly one data-layout element, a <div class="group ..."> with that value.
+layout_wrapper_is() { [ "$(layout_wrappers "$1")" = "div|$2|group" ]; }
+layout_wrapper_any() { local w; w="$(layout_wrappers "$1")"; [ "$w" = "div|price|group" ] || [ "$w" = "div|specs|group" ]; }
+
 # Trimmed text content of the first <h1>...</h1> (tags inside, if any, stripped).
 cat >"$WORK/h1.mjs" <<'JS'
 import { readFileSync } from "node:fs";
@@ -237,6 +280,9 @@ fetch_page robots_bogus "/?category=robots&layout=bogus"
 fetch_page specs "/?layout=specs"
 fetch_page washable_specs "/?q=washable&layout=specs"
 fetch_page bath_specs "/?category=bath&layout=specs"
+# P05
+fetch_page bogus "/?layout=bogus"
+fetch_page specs_member "/?layout=specs" "$GOOD_COOKIE"
 
 # Catalog-only pages, for the R20 "every catalog link keeps state" loop below: P04 adds
 # non-catalog pages (detail, login, not-found) to $FETCHED for the R18 streaming check,
@@ -536,6 +582,80 @@ check "R15: /login (no error param) has no role=\"alert\"" lacks "$P" 'role="ale
 
 P="$(page login_error_bogus)"
 check "R15: /login?error=bogus has no role=\"alert\"" lacks "$P" 'role="alert"'
+
+# =====================================================================
+# P05: layout toggle island (server HTML for no-JS clients)
+# =====================================================================
+
+# --- R5: layout options are two plain links in the server HTML -------------
+# NAME | expected Price first href | expected Specs first href | active layout
+# (hrefs in their HTML-escaped form, as catalogHref renders them: category, q, layout).
+P05_OPTIONS=(
+  "anon|/|/?layout=specs|price"
+  "member|/|/?layout=specs|price"
+  "badcookie|/|/?layout=specs|price"
+  "bath|/?category=bath|/?category=bath&amp;layout=specs|price"
+  "washable|/?q=washable|/?q=washable&amp;layout=specs|price"
+  "washable_member|/?q=washable|/?q=washable&amp;layout=specs|price"
+  "activity|/?category=activity-sensory|/?category=activity-sensory&amp;layout=specs|price"
+  "activity_member|/?category=activity-sensory|/?category=activity-sensory&amp;layout=specs|price"
+  "zzz|/?q=zzz|/?q=zzz&amp;layout=specs|price"
+  "robots_bogus|/|/?layout=specs|price"
+  "specs|/|/?layout=specs|specs"
+  "washable_specs|/?q=washable|/?q=washable&amp;layout=specs|specs"
+  "bath_specs|/?category=bath|/?category=bath&amp;layout=specs|specs"
+  "bogus|/|/?layout=specs|price"
+  "specs_member|/|/?layout=specs|specs"
+)
+for row in "${P05_OPTIONS[@]}"; do
+  IFS='|' read -r name price_href specs_href active <<<"$row"
+  P="$(page "$name")"
+  if [ "$active" = "price" ]; then pc="true"; sc="-"; else pc="-"; sc="true"; fi
+  check "R5: [$name] status 200" status_is "$P" 200
+  check "R5: [$name] one <a>Price first</a>, href=$price_href, aria-current=$pc, no aria-pressed, no role" \
+    option_is "$P" "Price first" "href=$price_href|aria-current=$pc|aria-pressed=-|role=-"
+  check "R5: [$name] one <a>Specs first</a>, href=$specs_href, aria-current=$sc, no aria-pressed, no role" \
+    option_is "$P" "Specs first" "href=$specs_href|aria-current=$sc|aria-pressed=-|role=-"
+  check "R5: [$name] no 'aria-pressed' anywhere in the server HTML" lacks "$P" "aria-pressed"
+  check "R5: [$name] no 'role=\"button\"' anywhere in the server HTML" lacks "$P" 'role="button"'
+done
+
+# --- R6 / R3: exactly one data-layout, on the grid wrapper <div class="group ..."> ---
+# NAME | expected data-layout
+P05_LAYOUTS=(
+  "anon|price"
+  "specs|specs"
+  "bogus|price"
+  "specs_member|specs"
+)
+for row in "${P05_LAYOUTS[@]}"; do
+  IFS='|' read -r name want <<<"$row"
+  P="$(page "$name")"
+  check "R6: [$name] 'data-layout=' occurs exactly once" count_is "$P" "data-layout=" 1
+  check "R6: [$name] data-layout=\"$want\" occurs exactly once" count_is "$P" "data-layout=\"$want\"" 1
+  check "R3: [$name] the data-layout element is a <div> with class 'group', data-layout=$want" layout_wrapper_is "$P" "$want"
+done
+for name in bath washable washable_member robots_bogus washable_specs bath_specs member badcookie activity_member; do
+  check "R3: [$name] exactly one data-layout element, a <div> with class 'group'" layout_wrapper_any "$(page "$name")"
+done
+
+# --- R3: empty state still renders no data-layout (P03 R19d) ---------------
+for name in activity zzz; do
+  check "R3: [$name] empty state has no 'data-layout='" lacks "$(page "$name")" "data-layout="
+done
+
+# --- R6: logged in /?layout=specs keeps all Set B / member-price checks ------
+P="$(page specs_member)"
+check "R6: /?layout=specs logged in status 200" status_is "$P" 200
+for n in "${ALL_NAMES_IN_ORDER[@]}"; do check "R6: /?layout=specs logged in contains '$n'" has "$P" "$n"; done
+for p in "${MEMBER_PRICES[@]}"; do check "R6: /?layout=specs logged in contains member price $p" has "$P" "$p"; done
+for p in "${PUBLIC_EVERYDAY[@]}" "${AUTH_EVERYDAY[@]}"; do check "R6: /?layout=specs logged in lacks everyday price $p" lacks "$P" "$p"; done
+
+# --- R6: logged out /?layout=specs still has no Set B and no member prices ---
+P="$(page specs)"
+for n in "${AUTH_NAMES[@]}"; do check "R6: /?layout=specs logged out lacks authenticated name '$n'" lacks "$P" "$n"; done
+for p in "${MEMBER_PRICES[@]}"; do check "R6: /?layout=specs logged out lacks member price $p" lacks "$P" "$p"; done
+for p in "${PUBLIC_EVERYDAY[@]}"; do check "R6: /?layout=specs logged out contains everyday price $p" has "$P" "$p"; done
 
 # --- Summary ----------------------------------------------------------------
 echo

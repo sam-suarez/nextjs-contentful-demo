@@ -6,10 +6,10 @@ Owned by the orchestrator (`agents/orchestrator.md`). No other agent edits this 
 
 | Field | Value |
 |---|---|
-| Phase | 05 layout toggle |
+| Phase | 06 release check |
 | Status | spec <!-- not started / spec / build / review / done / escalated --> |
 | Build round | 0 of 3 used |
-| Base commit | (phase 04 wip commit) |
+| Base commit | (phase 05 commit) |
 | Open escalation | OI-1 (phase 04 R17), see `handoffs/OPEN-ISSUES.md`. Batch run in progress (D-026 suspended for this thread) |
 
 ## Phase plan
@@ -22,7 +22,7 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 02 data layer | data-auth | Mock and live adapters, source selection + one log line, `fetchProducts` (`'use cache'`), `src/lib/dal.ts` (`verifySession`, `getProducts`, `getProductBySlug`), pure `filterProducts` | Unit: logged out never returns `authenticated`, logged in returns both sets, slug results (product / requires login / not found), category, `q` and combined filters, `https:` prefix on live image URLs, empty `CONTENTFUL_*` selects mock | done (1 round used) | `feat(data): phase 02 - data layer` |
 | 03 catalog | ui | Design tokens + fonts + root layout/footer, site header (both variants, sign-out form), banner, `/` with `instant = false`, both card variants (Set B mixed in with "Members only" badge), price, image placeholder, filter card (search form, category links, layout links, count, Clear filters), empty state, `next.config.ts` images, `lucide-react` (`docs/design.md`) | `scripts/verify-ssr.sh`: both directions with a self-minted cookie, no `<div hidden id="S:`, no `<!--$?-->`, no fallback text, a filtered URL renders filtered HTML | done (2 rounds used) | `feat(catalog): phase 03 - catalog` |
 | 04 detail + login | ui | `/products/[slug]` (307 to `/login?next=`, `notFound()` + `not-found.tsx`), `/login` page with `?error=missing` alert (`docs/design.md`) | Extend verify-ssr.sh (unknown slug 404, Set B slug 307 with `next`, logged-in detail price); add `playwright.config.ts` + browser install; e2e: login → Set B visible → logout | escalated (3 rounds used; OI-1, R17) | `wip(detail): phase 04 - detail + login (escalated: …)` |
-| 05 layout toggle | ui | Client island in `src/components/client/` replacing the P03 layout links (still real links without JS), `data-layout` on the grid, `group-data` switching, `history.replaceState` URL sync | e2e: toggle reorders cards with no navigation/reload; JS disabled: `?layout=specs` renders specs-first | not started | |
+| 05 layout toggle | ui | Client island in `src/components/client/` replacing the P03 layout links (still real links without JS), `data-layout` on the grid, `group-data` switching, `history.replaceState` URL sync | e2e: toggle reorders cards with no navigation/reload; JS disabled: `?layout=specs` renders specs-first | done (1 round used) | `feat(layout): phase 05 - layout toggle` |
 | 06 release check | qa only | Runs every check against `next build && next start`, incl. the JS-disabled Playwright project | (none: no builder). Each failure becomes `phase-NN-fixK` for the owner of the failing path | not started | |
 
 ### Phase notes for spec writing
@@ -40,6 +40,8 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 - P03 open for the human: the title-area decoration may overlap the title text just above `md` (~768px), and npm flipped `@types/react` / `csstype` to `devOptional` in the lockfile when adding lucide-react.
 - P04: `next` must survive the round trip `/products/<slug>` → `/login?next=…` → back to the product, including through the `?error=missing` redirect. `/login` exports `instant = false`. `not-found.tsx` gets no props, so its copy does not echo the slug.
 - P05: the island receives the current layout only and renders real links (no-JS fallback). Cards stay server components.
+- P05 contract as built: `src/components/client/layout-toggle.tsx` exports `LayoutProvider({ layout, children })`, `LayoutGrid({ children })`, `LayoutToggle({ hrefs })`; layout read from `useSearchParams()` (needs `/` to stay dynamic). Playwright projects `chromium` and `chromium-no-js` (`*.nojs.spec.ts`).
+- P06: release check runs every check against `next build && next start`. `e2e/login.spec.ts` R17 fails until OI-1 is decided; record it under OI-1, not as a fix phase (its owner depends on the decision).
 
 ## Round and escalation log
 
@@ -70,6 +72,9 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 04 | 3 | batch-run thread: human check "EDIT DONE"; re-locked (18 files, adds `e2e/not-found.spec.ts`) | ui round 3, fix input qa.md |
 | 04 | 3 | ui build: no source change; R17 cause traced to the preserved `<Activity>` entry replaying the client `redirect()`; no fix inside ui paths/spec; test lock intact | escalated by ui |
 | 04 | 3 | qa post-build: FAIL on R17 only (typecheck/lint/unit 305/boundary/build OK, verify-ssr 380/380, e2e 2/3) | escalated (3 rounds used): OI-1; no review; committed as wip |
+| 05 | 0 | qa pre-build: `playwright.config.ts` (2 projects), `e2e/layout-toggle.spec.ts` (10), `e2e/layout-toggle.nojs.spec.ts` (4), verify-ssr R3/R5/R6 (551 total); 9 JS tests fail on missing `aria-pressed` (no island), guards of unchanged markup pass | tests locked (20 files) |
+| 05 | 1 | ui build: `src/components/client/layout-toggle.tsx` (new) + filter-card, product-grid, page; all checks pass, e2e 16/17 (only R17, OI-1); test lock intact | qa post-build PASS |
+| 05 | 1 | reviewer: PASS on R1–R15, G1–G6 | closed, committed |
 
 ## Human checks
 
@@ -80,3 +85,4 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 02 data layer (04e62d2) | PASSED | Recorded at the start of the phase 03 thread. Started from a pasted prompt again (Human check line filled in this time), so the orchestrator path-guard hook is not registered; Paths kept by hand |
 | 03 catalog (06d1f58) | PASSED | Recorded at the start of the phase 04 thread via `/phase PASSED` |
 | 04 detail + login (wip, escalated) | DEFERRED (batch run) | OI-1 open; see `handoffs/phase-04/human-check.md` |
+| 05 layout toggle | DEFERRED (batch run) | see `handoffs/phase-05/human-check.md` |
