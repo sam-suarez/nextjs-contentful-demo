@@ -2,7 +2,7 @@
 
 A small product catalog with simulated login, members-only products and member pricing, all rendered on the server. The app was built by a team of specialised AI agents defined in Markdown (`/agents/`), run phase by phase with Claude Code.
 
-- **Live app:** not deployed yet
+- **Live app:** https://nextjs-contentful-demo.vercel.app
 - **Demo login:** any username and any password
 - **How the agents work, and what went wrong:** [AGENT.md](AGENT.md)
 
@@ -60,7 +60,7 @@ For a manual pass in the browser, use [docs/manual-qa.md](docs/manual-qa.md).
 
 ## Deploy
 
-Not deployed yet. On Vercel: import the repository, set `SESSION_SECRET` (and the `CONTENTFUL_*` variables for live content), and deploy with the default Next.js settings.
+Deployed on Vercel: https://nextjs-contentful-demo.vercel.app. To deploy your own copy, import the repository, set `SESSION_SECRET` (and the `CONTENTFUL_*` variables for live content), and deploy with the default Next.js settings.
 
 ## Repository map
 
