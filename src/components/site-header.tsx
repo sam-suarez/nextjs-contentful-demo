@@ -6,7 +6,6 @@ import { MemberPricingBadge } from "@/components/badge";
 import { Logo } from "@/components/logo";
 import { HeaderSessionSkeleton } from "@/components/skeletons";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, CONTAINER, HEADER_SESSION_SLOT, TEXT_LINK } from "@/components/ui-classes";
-import { logout } from "@/lib/auth/actions";
 import { verifySession } from "@/lib/dal";
 
 /**
@@ -62,7 +61,7 @@ async function SessionControls() {
           Signed in as <strong className="font-bold">{session.name}</strong>
         </p>
       </div>
-      <form action={logout} className="shrink-0">
+      <form method="post" action="/logout" className="shrink-0">
         <button type="submit" className={BUTTON_SECONDARY}>
           Sign out
         </button>

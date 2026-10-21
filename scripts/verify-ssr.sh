@@ -5,6 +5,7 @@
 # P04-fix1 additions: proxy 307 for members-only slugs (R4, R10) and the slug-cache log (R11).
 # P07 (D-031): the R18 loop (no streaming wrappers, no fallback / "Loading" text) is removed.
 # Streamed content is part of the response body and counts as present (P07 R11, R12).
+# P04-fix2 additions (D-034): POST /logout route handler (R4-R7) and the sign-out form (R8).
 #
 # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
 # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
@@ -214,6 +215,80 @@ fetch_page() {
 }
 page() { echo "$WORK/$1.html"; }
 
+# P04-fix2 (D-034): post_page NAME PATH [COOKIE] [ORIGIN]: a form-style POST (empty
+# urlencoded body, like the browser's sign-out form), same output files as fetch_page.
+post_page() {
+  local name="$1" path="$2" cookie="${3:-}" origin="${4:-}"
+  local out="$WORK/$name.html"
+  local code
+  local args=(-s --max-time 60 -X POST -H "Content-Type: application/x-www-form-urlencoded" --data-binary "")
+  [ -n "$cookie" ] && args+=(-H "Cookie: $cookie")
+  [ -n "$origin" ] && args+=(-H "Origin: $origin")
+  code="$(curl "${args[@]}" -D "$out.headers" -o "$out" -w '%{http_code}' "$BASE$path" || echo 000)"
+  [ -f "$out" ] || : >"$out"
+  [ -f "$out.headers" ] || : >"$out.headers"
+  echo "$code" >"$out.status"
+}
+
+# P04-fix2 R5/R6: Set-Cookie lines for the `session` cookie in a response.
+# session_cookie_cleared FILE: at least one, and every one clears it (empty value and
+# Max-Age=0 or an Expires in the past). no_session_set_cookie FILE: none at all.
+cat >"$WORK/set-cookie.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [mode, file] = process.argv.slice(2);
+const lines = readFileSync(file, "utf8").split(/\r?\n/).filter((l) => /^set-cookie:/i.test(l));
+const session = lines
+  .map((l) => l.replace(/^set-cookie:\s*/i, ""))
+  .filter((c) => c.split(";")[0].split("=")[0].trim() === "session");
+if (mode === "none") process.exit(session.length === 0 ? 0 : 1);
+const cleared = (c) => {
+  const [pair, ...attrs] = c.split(";").map((s) => s.trim());
+  const value = pair.slice(pair.indexOf("=") + 1);
+  if (value !== "") return false;
+  for (const a of attrs) {
+    const i = a.indexOf("=");
+    const k = (i < 0 ? a : a.slice(0, i)).toLowerCase();
+    const v = i < 0 ? "" : a.slice(i + 1);
+    if (k === "max-age" && Number(v) <= 0) return true;
+    if (k === "expires" && Date.parse(v) < Date.now()) return true;
+  }
+  return false;
+};
+process.exit(session.length > 0 && session.every(cleared) ? 0 : 1);
+JS
+session_cookie_cleared() { node "$WORK/set-cookie.mjs" cleared "$1.headers"; }
+no_session_set_cookie() { node "$WORK/set-cookie.mjs" none "$1.headers"; }
+
+# P04-fix2 R8: the <form ... action="/logout" ...>...</form> blocks. Prints one line per form:
+# "method=<v>|buttons=<n>|action_id=<0|1>" where buttons counts <button type="submit">
+# elements whose text (tags and <!-- --> stripped, trimmed) is exactly "Sign out".
+cat >"$WORK/logout-form.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [file] = process.argv.slice(2);
+const html = readFileSync(file, "utf8");
+const attrsOf = (s) => {
+  const m = new Map();
+  for (const a of (s ?? "").matchAll(/([^\s"'=<>\/]+)(?:\s*=\s*"([^"]*)")?/g)) m.set(a[1], a[2] ?? "");
+  return m;
+};
+const out = [];
+for (const f of html.matchAll(/<form(\s[^>]*)?>([\s\S]*?)<\/form>/g)) {
+  const attrs = attrsOf(f[1]);
+  if (attrs.get("action") !== "/logout") continue;
+  let buttons = 0;
+  for (const b of f[2].matchAll(/<button(\s[^>]*)?>([\s\S]*?)<\/button>/g)) {
+    const text = b[2].replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "").trim();
+    if (attrsOf(b[1]).get("type") === "submit" && text === "Sign out") buttons++;
+  }
+  out.push(`method=${attrs.get("method") ?? "-"}|buttons=${buttons}|action_id=${f[2].includes("$ACTION_ID_") ? 1 : 0}`);
+}
+process.stdout.write(out.join("\n"));
+JS
+logout_forms() { node "$WORK/logout-form.mjs" "$@"; }
+# logout_form_ok FILE: exactly one /logout form, method="post", one Sign out submit button,
+# and no server-action marker inside it.
+logout_form_ok() { [ "$(logout_forms "$1")" = "method=post|buttons=1|action_id=0" ]; }
+
 # --- Mock data facts (spec P03 table, name order) ---------------------------
 PUBLIC_NAMES=(
   "Bubble Bath Whale" "Cloud Bunny Plush" "Jingle Ball Trio" "Ocean Wave Rattle"
@@ -342,6 +417,16 @@ fetch_page login_next_valid "/login?next=%2Fproducts%2Fforest-friends-activity-c
 fetch_page login_next_unsafe "/login?next=%2F%2Fevil.com"
 fetch_page login_error_missing "/login?error=missing"
 fetch_page login_error_bogus "/login?error=bogus"
+# P04-fix2 (D-034): POST /logout. Fetched last among the session requests; the server keeps
+# no session state, so GOOD_COOKIE stays valid for any later request anyway.
+post_page logout_member "/logout" "$GOOD_COOKIE"
+post_page logout_member_same_origin "/logout" "$GOOD_COOKIE" "$BASE"
+post_page logout_anon "/logout"
+post_page logout_anon_same_origin "/logout" "" "$BASE"
+post_page logout_evil "/logout" "$GOOD_COOKIE" "https://evil.example"
+post_page logout_evil_anon "/logout" "" "https://evil.example"
+fetch_page logout_get "/logout"
+fetch_page logout_get_member "/logout" "$GOOD_COOKIE"
 
 # --- R15: logged out --------------------------------------------------------
 P="$(page anon)"
@@ -739,6 +824,45 @@ P="$(page specs)"
 for n in "${AUTH_NAMES[@]}"; do check "R6: /?layout=specs logged out lacks authenticated name '$n'" lacks "$P" "$n"; done
 for p in "${MEMBER_PRICES[@]}"; do check "R6: /?layout=specs logged out lacks member price $p" lacks "$P" "$p"; done
 for p in "${PUBLIC_EVERYDAY[@]}"; do check "R6: /?layout=specs logged out contains everyday price $p" has "$P" "$p"; done
+
+# --- P04-fix2 (D-034): sign-out is POST /logout ------------------------------
+# R5: with the minted session cookie -> 303, Location: /, session cookie cleared.
+P="$(page logout_member)"
+check "P04-fix2 R5: POST /logout with a session status 303" status_is "$P" 303
+check "P04-fix2 R5: POST /logout with a session Location is exactly /" location_is "$P" "/"
+check "P04-fix2 R5: POST /logout with a session clears the session cookie (empty value, Max-Age=0 or past Expires)" session_cookie_cleared "$P"
+# R2 at HTTP level: the browser's own form POST carries Origin = the app's origin.
+P="$(page logout_member_same_origin)"
+check "P04-fix2 R5: POST /logout with a session and Origin $BASE status 303" status_is "$P" 303
+check "P04-fix2 R5: POST /logout with a session and Origin $BASE Location is exactly /" location_is "$P" "/"
+check "P04-fix2 R5: POST /logout with a session and Origin $BASE clears the session cookie" session_cookie_cleared "$P"
+# R4: no session -> same answer, no error.
+P="$(page logout_anon)"
+check "P04-fix2 R4: POST /logout without a session status 303" status_is "$P" 303
+check "P04-fix2 R4: POST /logout without a session Location is exactly /" location_is "$P" "/"
+P="$(page logout_anon_same_origin)"
+check "P04-fix2 R4: POST /logout without a session, Origin $BASE, status 303" status_is "$P" 303
+check "P04-fix2 R4: POST /logout without a session, Origin $BASE, Location is exactly /" location_is "$P" "/"
+# R6: foreign Origin -> 403, session untouched.
+P="$(page logout_evil)"
+check "P04-fix2 R6: POST /logout with Origin https://evil.example status 403" status_is "$P" 403
+check "P04-fix2 R6: POST /logout with Origin https://evil.example sends no Set-Cookie for session" no_session_set_cookie "$P"
+check "P04-fix2 R6: POST /logout with Origin https://evil.example has no Location header" location_is "$P" ""
+P="$(page logout_evil_anon)"
+check "P04-fix2 R4/R6: POST /logout without a session, Origin https://evil.example, status 403" status_is "$P" 403
+# R7: GET is not handled.
+P="$(page logout_get)"
+check "P04-fix2 R7: GET /logout status 405" status_is "$P" 405
+P="$(page logout_get_member)"
+check "P04-fix2 R7: GET /logout with a session status 405" status_is "$P" 405
+check "P04-fix2 R7: GET /logout with a session sends no Set-Cookie for session" no_session_set_cookie "$P"
+# R8: the session header variant's sign-out control is a plain POST form to /logout.
+P="$(page member)"
+check "P04-fix2 R8: / with a session has exactly one <form action=\"/logout\">, method=\"post\", one <button type=\"submit\">Sign out</button>, no \$ACTION_ID_ inside" logout_form_ok "$P"
+check "P04-fix2 R8: / with a session contains action=\"/logout\"" has "$P" 'action="/logout"'
+check "P04-fix2 R8: / with a session has a <form> with action=/logout and method=post" tag_exists "$P" form 'action=/logout' 'method=post'
+P="$(page anon)"
+check "P04-fix2 R8: / without a session has no <form action=\"/logout\">" no_tag "$P" form 'action=/logout'
 
 # --- Summary ----------------------------------------------------------------
 echo

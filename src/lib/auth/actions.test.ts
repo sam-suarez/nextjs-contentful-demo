@@ -37,8 +37,8 @@ vi.mock("@/lib/session", async (importOriginal) => {
 });
 
 import * as actions from "@/lib/auth/actions";
-import { login, logout } from "@/lib/auth/actions";
-import { createSession, deleteSession, signSession, verifySessionToken } from "@/lib/session";
+import { login } from "@/lib/auth/actions";
+import { createSession, deleteSession, verifySessionToken } from "@/lib/session";
 
 const SECRET = "actions-test-secret-0123456789-abcdef"; // > 32 chars
 const PASSWORD = "pw-Zx9-never-store-me";
@@ -221,35 +221,8 @@ describe("auth actions", () => {
     expect(JSON.stringify(calls)).not.toContain(PASSWORD);
   });
 
-  it("R12: logout with no session deletes the session cookie, then redirects to /", async () => {
-    mocks.cookieStore.get.mockReturnValue(undefined);
-    const url = await redirectedTo(() => logout());
-    expect(url).toBe("/");
-    expect(deleteSession).toHaveBeenCalledTimes(1);
-    expect(mocks.cookieStore.delete).toHaveBeenCalledTimes(1);
-    expect(mocks.cookieStore.delete).toHaveBeenCalledWith("session");
-    expect(mocks.redirect).toHaveBeenCalledTimes(1);
-    expect(mocks.redirect).toHaveBeenCalledWith("/");
-    expect(mocks.cookieStore.delete.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.redirect.mock.invocationCallOrder[0],
-    );
-  });
-
-  it("R12: logout with a valid session deletes the session cookie, then redirects to /", async () => {
-    const token = await signSession("ada");
-    mocks.cookieStore.get.mockImplementation((name: string) =>
-      name === "session" ? { name, value: token } : undefined,
-    );
-    const url = await redirectedTo(() => logout());
-    expect(url).toBe("/");
-    expect(deleteSession).toHaveBeenCalledTimes(1);
-    expect(mocks.cookieStore.delete).toHaveBeenCalledWith("session");
-    expect(mocks.cookieStore.delete.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.redirect.mock.invocationCallOrder[0],
-    );
-  });
-
-  it("R13: actions.ts exports only login and logout", () => {
-    expect(Object.keys(actions).sort()).toEqual(["login", "logout"]);
+  // Phase 04-fix2 R10 (D-034): the logout server action is removed; sign-out is POST /logout.
+  it("R10 (04-fix2): actions.ts exports only login", () => {
+    expect(Object.keys(actions).sort()).toEqual(["login"]);
   });
 });

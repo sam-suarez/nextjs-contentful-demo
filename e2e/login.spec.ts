@@ -1,13 +1,15 @@
 // R17: login -> Set B visible -> logout (STATE.md P04 qa row), D-018 (`next` round trip).
 // Phase 04-fix1 R12: the redirect now comes from src/proxy.ts (D-032), and the post-login check
 // is anchored to the URL pathname, so `/login?next=/products/<slug>` can no longer satisfy it.
+// Phase 04-fix2 R11 (OI-2, D-034): sign-out is a form POST to /logout, a full page load; after it,
+// with no reload, nothing of the members-only page is left anywhere in the DOM.
 // Playwright, JS enabled (javaScriptEnabled: true, the project default).
 import { expect, test } from "@playwright/test";
 
 const SLUG = "forest-friends-activity-cube";
 const DETAIL_PATH = `/products/${SLUG}`;
 
-test("R12 (P04 R17): login from a members-only product redirect reveals Set B pricing, logout hides it again", async ({
+test("R11 (04-fix2), R12 (04-fix1), P04 R17: login from a members-only redirect reveals Set B pricing; sign-out is a full page load that leaves no Set B in the DOM", async ({
   page,
 }) => {
   // Visiting a Set B product with no session redirects to /login?next=<encoded detail path>.
@@ -38,28 +40,42 @@ test("R12 (P04 R17): login from a members-only product redirect reveals Set B pr
   await expect(page.getByText("Members only", { exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(DETAIL_PATH);
 
-  // Signing out returns to / and drops the session: Set B content disappears again.
+  // Phase 04-fix2 R11 (OI-2, D-034): Sign out is a native form POST to /logout answered with
+  // 303 to /, i.e. a full document load. The previous members-only page must not survive anywhere
+  // in the DOM (not even in a hidden <Activity>), so the checks below are whole-DOM, no reload.
+  // A marker on the old window: a full page load gives a fresh window, so the marker is gone.
+  await page.evaluate(() => {
+    (window as unknown as { __beforeSignOut?: boolean }).__beforeSignOut = true;
+  });
+  const logoutRequest = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/logout" &&
+      request.isNavigationRequest() &&
+      request.resourceType() === "document",
+    { timeout: 10_000 },
+  );
   await page.getByRole("button", { name: "Sign out" }).click();
+  // A POST document (navigation) request to /logout happens.
+  await logoutRequest;
   await expect(page).toHaveURL((url) => url.pathname === "/");
-  // Phase 04-fix1 dispute: with cacheComponents on, Next keeps the previous route mounted under a
-  // hidden <Activity> (display: none) after client navigation, so whole-DOM counts would match
-  // content the visitor cannot see. The bundled docs say to be explicit about visibility
-  // (01-app/02-guides/preserving-ui-state.md, Testing). What the visitor sees on / must be the
-  // logged-out state.
+  await page.waitForLoadState("load");
+  expect(new URL(page.url()).pathname).toBe("/");
+  // The tab now holds a new document (full page load), not the client-routed old one.
+  expect(
+    await page.evaluate(() => (window as unknown as { __beforeSignOut?: boolean }).__beforeSignOut),
+  ).toBeUndefined();
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
-  await expect(page.getByText("Signed in as").filter({ visible: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-  await expect(page.getByText("Forest Friends Activity Cube").filter({ visible: true })).toHaveCount(0);
-  await expect(page.getByText("Member price", { exact: true }).filter({ visible: true })).toHaveCount(0);
-  await expect(page.getByText("$71.20", { exact: true }).filter({ visible: true })).toHaveCount(0);
+  // Whole DOM, hidden elements included, no reload.
+  await expect(page.getByText("Forest Friends Activity Cube")).toHaveCount(0);
+  await expect(page.getByText("Signed in as")).toHaveCount(0);
+  await expect(page.getByText("Member price", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("$71.20", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign out", includeHidden: true })).toHaveCount(0);
+  // Serialized DOM (includes hidden subtrees and inline payload): no Set B name, no session UI.
+  const html = await page.content();
+  expect(html).not.toContain("Forest Friends Activity Cube");
+  expect(html).not.toContain("Signed in as");
   // The session itself is gone, not just hidden: no `session` cookie is left in the browser.
   expect((await page.context().cookies()).some((cookie) => cookie.name === "session")).toBe(false);
-  // A fresh server response for / (a new document, so no hidden route is kept) carries no
-  // session UI and no Set B content anywhere in the DOM.
-  await page.reload();
-  await expect(page).toHaveURL((url) => url.pathname === "/");
-  await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
-  await expect(page.getByText("Signed in as")).toHaveCount(0);
-  await expect(page.getByText("Forest Friends Activity Cube")).toHaveCount(0);
-  await expect(page.getByText("$71.20", { exact: true })).toHaveCount(0);
 });

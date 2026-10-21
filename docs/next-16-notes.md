@@ -37,3 +37,4 @@ Versions: next 16.4.2, react 19.3, `cacheComponents: true`, `partialPrefetching:
 - With `instant = false` gone and request reads inside `<Suspense>`, `/`, `/login` and `/products/[slug]` all build `◐` (Partial Prerender). That is the expected D-031 state, not a regression.
 - `notFound()` called inside a `<Suspense>` boundary can't change the already-sent status: an unknown slug answers 200 with `noindex` and renders `not-found.tsx` from the stream. Only `src/proxy.ts` can give a real status code.
 - A client island calling `useSearchParams()` must sit inside a `<Suspense>` once the route is no longer fully dynamic, or the build fails.
+- In a Route Handler under `next start`, `request.url` is built from the server's listen config (`http://localhost:<port>`), not the `Host` header (`router-utils/resolve-routes.js`). For an Origin/CSRF check, compare the `Origin` host with `x-forwarded-host` ?? `host`, as Server Actions do.

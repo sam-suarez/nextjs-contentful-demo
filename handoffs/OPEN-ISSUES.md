@@ -37,7 +37,7 @@ Whichever you pick, `docs/architecture.md` (Server/client boundary, "`instant = 
 
 ## OI-2 · Phase 04-fix1 · R12 (P04 R17): after sign-out, the previous Set B page stays hidden in the browser's DOM
 
-**Status:** decided 2026-10-21: **option 2** (human check of 04-fix1 FAILED on this). Sign out posts to a `POST /logout` route handler that answers 303 to `/` (full page load); the logout server action is removed (D-034). `phase-04-fix2` escalated before spec: D-034 is not yet in `docs/decisions.md` and `docs/architecture.md:17,64` still say logout is a server action (`handoffs/phase-04-fix2/human-check.md`). Was: open, non-blocking. Found by data-auth and qa; confirmed by the reviewer's notes.
+**Status:** **CLOSED** by `phase-04-fix2` (2026-10-21): sign-out is a native POST to `/logout` answered with 303, so the browser does a full page load; e2e checks the whole DOM with no reload. Decided 2026-10-21: **option 2** (human check of 04-fix1 FAILED on this). Sign out posts to a `POST /logout` route handler that answers 303 to `/` (full page load); the logout server action is removed (D-034). `phase-04-fix2` escalated before spec: D-034 is not yet in `docs/decisions.md` and `docs/architecture.md:17,64` still say logout is a server action (`handoffs/phase-04-fix2/human-check.md`). Was: open, non-blocking. Found by data-auth and qa; confirmed by the reviewer's notes.
 
 **Requirement IDs:** phase-04-fix1 R12 (P04 R17). Related: D-031, assessment "Set B never reaches logged-out visitors".
 
