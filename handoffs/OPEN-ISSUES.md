@@ -37,7 +37,7 @@ Whichever you pick, `docs/architecture.md` (Server/client boundary, "`instant = 
 
 ## OI-2 · Phase 04-fix1 · R12 (P04 R17): after sign-out, the previous Set B page stays hidden in the browser's DOM
 
-**Status:** open, non-blocking (no phase depends on it). Found by data-auth and qa; confirmed by the reviewer's notes.
+**Status:** decided 2026-10-21: **option 2** (human check of 04-fix1 FAILED on this). Sign out posts to a `POST /logout` route handler that answers 303 to `/` (full page load); the logout server action is removed (D-034). `phase-04-fix2` escalated before spec: D-034 is not yet in `docs/decisions.md` and `docs/architecture.md:17,64` still say logout is a server action (`handoffs/phase-04-fix2/human-check.md`). Was: open, non-blocking. Found by data-auth and qa; confirmed by the reviewer's notes.
 
 **Requirement IDs:** phase-04-fix1 R12 (P04 R17). Related: D-031, assessment "Set B never reaches logged-out visitors".
 
@@ -53,6 +53,8 @@ Whichever you pick, `docs/architecture.md` (Server/client boundary, "`instant = 
 3. **Refresh the router cache on sign-out** (e.g. `refresh()` from the logout action). Untested whether it drops hidden `<Activity>` entries.
 
 ## Note · Decision IDs renumbered (Step A)
+
+**Status:** CLOSED 2026-10-21: the human keeps D-031/D-032.
 
 The prompt named the new decisions D-030 and D-031, but `docs/decisions.md` already had a D-030 (AGENTS.md vs AGENT.md, cited in `docs/progress.md:47`), and rows may not be deleted. The orchestrator used **D-031** (Suspense skeletons) and **D-032** (proxy redirect). If you'd rather keep your numbering, the old D-030 row has to be renumbered instead (a human edit to `docs/decisions.md` and `docs/progress.md`).
 

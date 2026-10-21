@@ -103,7 +103,7 @@ Server components in `src/components/` unless marked as an island.
 | **Price** | Label (uppercase label style) above the amount (Outfit 800, `tabular-nums`). Logged out: label "Everyday price", amount in `foreground`. Logged in: label "Member price" in `accent-strong`, amount in `accent-strong`. Format: `Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })`, always two decimals (`$11.20`, `$9.00`) |
 | **Image frame** | Square, `object-contain`, on a dot-pattern backdrop tinted with the category colour at low opacity. `next/image` with `unoptimized` (architecture.md Error handling) and the product name as `alt` |
 | **Image placeholder** | Same frame size, dashed 2 px `input-border`, `muted` fill, `ImageOff` icon in a white circle, text "Picture coming soon". Used when `image` is absent |
-| **Banner** | Full-width strip under the header, white, bottom border. One sentence plus an optional text link (copy below) |
+| **Banner** | Full-width strip under the header, white, bottom border. One sentence plus an optional text link (copy below). The text box keeps a minimum height so the logged-out and logged-in banners are the same height (three lines below about 360 px; accepted after P07, D-031) |
 | **Segmented control** (layout) | Label "Layout"; pill track in `muted`, two options "Price first" / "Specs first"; the active one is white with a 2 px `foreground` border and `shadow-pop`. Exposes `aria-pressed` (island) or `aria-current` (links) |
 | **Empty state** | Centred inside a sticker card: a cluster of three confetti shapes, heading "No toys match your search", body (copy below), secondary button "Clear filters" |
 | **Alert** | 2 px `foreground` border, `bg-secondary/20`, `rounded-lg`, `role="alert"` |
@@ -113,7 +113,7 @@ Server components in `src/components/` unless marked as an island.
 
 - **Root layout** (`src/app/layout.tsx`): fonts, cream dot-grid background, `<main>`, and the static **footer**. The root layout never reads the session: a session read there would make every route block (D-020).
 - **Site header** (a server component rendered by each page, not by the layout). Two variants:
-  - `session` (used by `/` and `/products/[slug]`): logo on the left. Logged out: primary button "Sign in" linking to `/login`. Logged in: "Member pricing" badge, "Signed in as **<name>**", and secondary button "Sign out" (a `<form>` posting the logout server action, so it works without JS).
+  - `session` (used by `/` and `/products/[slug]`): logo on the left. Logged out: primary button "Sign in" linking to `/login`. Logged in: "Member pricing" badge, "Signed in as **<name>**", and secondary button "Sign out" (a plain `<form method="post" action="/logout">`, so it works without JS; D-034). Below `md` the session controls sit on their own full-width 48 px row under the logo: logged out, "Sign in" drops below the logo; logged in, the badge sits above the "Signed in as" name, and long names are truncated with "…" (accepted after P07, D-031).
   - `minimal` (used by `/login` and `not-found.tsx`): logo on the left, text link "Back to catalog" on the right. It reads no session.
 - **Container:** `max-w-6xl`, 16 px side padding on mobile, 24 px from `md`.
 - **Footer:** white strip, top border. Left: "Tiny Confetti demo catalog". Right: "Prices in USD. Member prices need sign-in."
@@ -202,8 +202,8 @@ Catalog / Plush / Cloud Bunny Plush            (breadcrumb, text links)
 
 - Two columns from `lg` (image 7 columns, info 5), stacked below.
 - Breadcrumb category links to `/?category=<value>`.
-- **Logged out:** price card as above. "Sign in for member pricing" is a secondary button linking to `/login?next=/products/<slug>`.
-- **Logged in:** label "Member price", amount in `accent-strong`, no sign-in row. A members-only product shows the "Members only" badge next to the h1.
+- **Logged out:** price card as above. "Sign in for member pricing" is a secondary button linking to `/login?next=/products/<slug>`. The prompt text and the button are always stacked (text above the button), whatever the card width (accepted after P07, D-031).
+- **Logged in:** label "Member price", amount in `accent-strong`, no sign-in row; the card keeps an empty area of the same height (about 80 px) where visitors see it, so the card is the same size in both states (accepted after P07, D-031). A members-only product shows the "Members only" badge next to the h1.
 - The features list is omitted when `features` is absent.
 
 ### Login `/login` (P04)
@@ -227,6 +227,7 @@ Catalog / Plush / Cloud Bunny Plush            (breadcrumb, text links)
 
 - Fields `username` (placeholder "demo") and `password` (type `password`, placeholder "Any password"), both `required`. The form posts the login server action; a hidden `next` input carries the `next` search param through.
 - Empty input after trimming: the action redirects to `/login?error=missing` (keeping `next`), and the page shows the alert "Enter a username and password to sign in." This works without JavaScript; no `useActionState` client component.
+- The intro and demo note keep a fixed minimum height, so the login card matches its skeleton (accepted after P07, D-031).
 - Decoration: two confetti shapes peeking out from behind the card corners (md+).
 
 ### Not found (P04)

@@ -1,7 +1,7 @@
 # Phase 04-fix1: Human check
 
 **Status:** closed (commit: see `git log --grep "phase 04-fix1"`)
-**Result:** DEFERRED (batch run)
+**Result:** FAILED (2026-10-21): after sign-out the previous members-only page stays in the hidden DOM until reload (OI-2). Human decision: OI-2 = option 2, sign-out posts to a `POST /logout` route handler that answers 303 to `/` (full page load); remove the logout server action (D-034). Fix phase: `phase-04-fix2` (escalated before spec, see its `human-check.md`)
 
 ## Escalation
 

@@ -6,15 +6,16 @@ Source of truth for how the app is built. Agent definitions in `/agents/` and th
 
 Next.js 16 (App Router, Cache Components + Partial Prefetching on), React 19, TypeScript, Tailwind v4 (CSS-first, no `tailwind.config.js`), Contentful (live) or `src/data/products.mock.json` (mock), zod, jose, Vitest, Playwright.
 
-## Routes (D-017, D-018, D-032)
+## Routes (D-017, D-018, D-032, D-034)
 
 | Route | Renders | Auth |
 |---|---|---|
 | `/` | Catalog: one grid sorted by name. Set A always; with a session, Set B products are mixed into the same grid with a "Members only" badge. Filters + layout toggle | Public; content depends on session |
 | `/products/[slug]` | Product detail | Set B slug without session: `src/proxy.ts` answers 307 to `/login?next=/products/<slug>` before rendering (D-032); the page still asks the DAL. Unknown slug: `notFound()` |
 | `/login` | Login form: `username` + `password`, any non-empty values are accepted; the password is never stored. Empty input redirects to `/login?error=missing` (keeping `next`) | Logged-in visitors are redirected to `/` |
+| `/logout` | Route handler, `POST` only (no page): deletes the session cookie and answers 303 with `Location: /`, so the browser does a full page load. Other methods get 405. A request whose `Origin` header is present and differs from the app's origin gets 403 | Any (with or without a session) |
 
-Logout is a server action, not a route. `next` is only followed if it is a same-origin relative path (starts with `/`, not `//`).
+Logout is the `POST /logout` route handler (`src/app/logout/route.ts`), not a server action, so sign-out ends in a full page load and the client keeps no hidden copy of the previous page (D-034). `next` is only followed if it is a same-origin relative path (starts with `/`, not `//`).
 
 ## Directory layout (D-022)
 
@@ -58,10 +59,10 @@ public/products/        product SVGs (source of truth for art)
 - Filter controls: search is `next/form` with GET (hidden inputs keep `category` and `layout`); category chips are `<Link>`s that keep `q` and `layout`. Clear Filters: `<Link href="/">`.
 - Layout toggle: a client island flips `data-layout` on the grid wrapper and keeps the URL in sync. Its options are real links, so it still works without JS. Both card variants are server-rendered; Tailwind `group-data-[layout=specs]:` utilities switch columns, orientation and the visible spec block, and move the single price element with `order-*`. No refetch. Until the island exists (P05), the options are plain server links.
 
-## Auth (D-012, D-017, D-032)
+## Auth (D-012, D-017, D-032, D-034)
 
 - Session cookie: named `session`, a jose HS256 JWT signed with `SESSION_SECRET` (required, at least 32 characters; session functions throw if it is missing or too short). Flags: `httpOnly`, `secure` in production, `sameSite: "lax"`, `path: "/"`, 7-day expiry. Payload holds only the display name and expiry.
-- Login and logout are server actions in `src/lib/auth/actions.ts`; they validate input with zod and re-check the session themselves.
+- Login is a server action in `src/lib/auth/actions.ts`; it validates input with zod and re-checks the session itself. Logout is the `POST /logout` route handler, which calls `deleteSession()` from `src/lib/session.ts` (D-034).
 - `proxy.ts` (Node runtime in Next 16) does optimistic redirects only. It is never the authorization check. Its matcher covers `/login` and `/products/:slug`:
   - `/login` with a valid session: 307 to `/`.
   - `/products/<slug>` without a valid session, when the slug is a Set B (`authenticated`) product: 307 to `/login?next=/products/<slug>`, before rendering (D-032). Public and unknown slugs pass through.
@@ -81,4 +82,5 @@ public/products/        product SVGs (source of truth for art)
 - SSR checks (`scripts/verify-ssr.sh`, Playwright) run without `CONTENTFUL_*` vars so they get deterministic mock data. Because Next loads `.env.local` itself, the checks export the three vars as empty strings (Next never overwrites a var already in the environment) and set their own `SESSION_SECRET`.
 - SSR checks assert both directions on the HTTP response body: Set B names and member prices present with a session, absent without one; everyday prices present without one (D-031). Streamed content counts, because it is in the same response; there are no streaming-wrapper, fallback-text or no-JS assertions.
 - The Set B slug redirect is checked at the HTTP level: a logged-out request gets status 307 with `Location: /login?next=/products/<slug>` (D-032).
+- Sign-out is checked at the HTTP level (`POST /logout` with a session: 303, `Location: /`, the `session` cookie cleared; a foreign `Origin`: 403) and in e2e (after Sign out, with no reload, no Set B name anywhere in the DOM) (D-034).
 - Layout shift: an e2e test measures Cumulative Layout Shift with a `PerformanceObserver` while the skeletons are replaced, and expects it to stay below 0.01 (D-031).
