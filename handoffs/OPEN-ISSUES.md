@@ -30,3 +30,14 @@ Escalations from the batch run (phases 04 → 05 → 06, one thread; D-026 suspe
 Whichever you pick, `docs/architecture.md` (Server/client boundary, "`instant = false` … render fully on the server") and `agents/ui.md` are inaccurate for this route and need a human edit (no agent may edit them).
 
 **Effect on later phases.** Phase 05 (layout toggle on `/`) does not depend on this route, so it runs; R17 is excluded from its gating checks. Phase 06 (release check) re-runs the full e2e suite: R17 will fail there and is recorded under this issue instead of opening a fix phase, because its owner depends on the decision above.
+
+**Phase 06 (release check) confirmation:** clean build + every check run. R17 is the only failing check (`[chromium] e2e/login.spec.ts:8`, fails at `:23`, 13 "Member price" matches = catalog at `/`). No fix phase opened, because the owner depends on the decision above.
+
+## Non-blocking notes for the human (not escalations)
+
+- **P05 limitation:** after a JS layout toggle, the category chips, the search form's hidden `layout` input and Clear filters keep their pre-toggle hrefs, so following one drops the toggled layout (`handoffs/phase-05/spec.md` Contract decisions).
+- **P05 a11y:** hydrated layout options are `<a role="button" aria-pressed>`; Enter activates them, Space does not (reviewer note).
+- **P05:** `LayoutProvider` reads `useSearchParams()`, which only builds without `<Suspense>` because `/` is dynamic; keep `instant = false` on `/`.
+- **P06 R9:** `.env.example` has `CONTENTFUL_ENVIRONMENT=master` (a default, not a secret).
+- **Docs:** `docs/architecture.md` (Server/client boundary: `instant = false` "render fully on the server") and `agents/ui.md` are inaccurate for `/products/[slug]` (agents may not edit them).
+- **qa process:** during P05 pre-build, qa ran `pkill -f next-server`, which would also stop a dev server you had running.

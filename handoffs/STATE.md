@@ -6,11 +6,11 @@ Owned by the orchestrator (`agents/orchestrator.md`). No other agent edits this 
 
 | Field | Value |
 |---|---|
-| Phase | 06 release check |
-| Status | spec <!-- not started / spec / build / review / done / escalated --> |
-| Build round | 0 of 3 used |
-| Base commit | (phase 05 commit) |
-| Open escalation | OI-1 (phase 04 R17), see `handoffs/OPEN-ISSUES.md`. Batch run in progress (D-026 suspended for this thread) |
+| Phase | none (batch run finished; next: OI-1 decision → phase-04 fix) |
+| Status | done <!-- not started / spec / build / review / done / escalated --> |
+| Build round | n/a |
+| Base commit | f7dff1f |
+| Open escalation | OI-1 (phase 04 R17), see `handoffs/OPEN-ISSUES.md`. Batch run finished; D-026 back in force from the next thread |
 
 ## Phase plan
 
@@ -23,7 +23,7 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 03 catalog | ui | Design tokens + fonts + root layout/footer, site header (both variants, sign-out form), banner, `/` with `instant = false`, both card variants (Set B mixed in with "Members only" badge), price, image placeholder, filter card (search form, category links, layout links, count, Clear filters), empty state, `next.config.ts` images, `lucide-react` (`docs/design.md`) | `scripts/verify-ssr.sh`: both directions with a self-minted cookie, no `<div hidden id="S:`, no `<!--$?-->`, no fallback text, a filtered URL renders filtered HTML | done (2 rounds used) | `feat(catalog): phase 03 - catalog` |
 | 04 detail + login | ui | `/products/[slug]` (307 to `/login?next=`, `notFound()` + `not-found.tsx`), `/login` page with `?error=missing` alert (`docs/design.md`) | Extend verify-ssr.sh (unknown slug 404, Set B slug 307 with `next`, logged-in detail price); add `playwright.config.ts` + browser install; e2e: login → Set B visible → logout | escalated (3 rounds used; OI-1, R17) | `wip(detail): phase 04 - detail + login (escalated: …)` |
 | 05 layout toggle | ui | Client island in `src/components/client/` replacing the P03 layout links (still real links without JS), `data-layout` on the grid, `group-data` switching, `history.replaceState` URL sync | e2e: toggle reorders cards with no navigation/reload; JS disabled: `?layout=specs` renders specs-first | done (1 round used) | `feat(layout): phase 05 - layout toggle` |
-| 06 release check | qa only | Runs every check against `next build && next start`, incl. the JS-disabled Playwright project | (none: no builder). Each failure becomes `phase-NN-fixK` for the owner of the failing path | not started | |
+| 06 release check | qa only | Runs every check against `next build && next start`, incl. the JS-disabled Playwright project | (none: no builder). Each failure becomes `phase-NN-fixK` for the owner of the failing path | done (all PASS except R17/OI-1; no fix phases) | `test(release): phase 06 - release check` |
 
 ### Phase notes for spec writing
 
@@ -75,6 +75,7 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 05 | 0 | qa pre-build: `playwright.config.ts` (2 projects), `e2e/layout-toggle.spec.ts` (10), `e2e/layout-toggle.nojs.spec.ts` (4), verify-ssr R3/R5/R6 (551 total); 9 JS tests fail on missing `aria-pressed` (no island), guards of unchanged markup pass | tests locked (20 files) |
 | 05 | 1 | ui build: `src/components/client/layout-toggle.tsx` (new) + filter-card, product-grid, page; all checks pass, e2e 16/17 (only R17, OI-1); test lock intact | qa post-build PASS |
 | 05 | 1 | reviewer: PASS on R1–R15, G1–G6 | closed, committed |
+| 06 | 1 | qa release run (post-build mode, no builder): clean build OK, typecheck/lint/unit 305/boundary OK, verify-ssr 551/551, e2e 16/17 (only R17, OI-1), source scan/.env.example/git status OK; test lock intact; diff empty, no review | closed, committed; no fix phases |
 
 ## Human checks
 
@@ -85,4 +86,5 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 02 data layer (04e62d2) | PASSED | Recorded at the start of the phase 03 thread. Started from a pasted prompt again (Human check line filled in this time), so the orchestrator path-guard hook is not registered; Paths kept by hand |
 | 03 catalog (06d1f58) | PASSED | Recorded at the start of the phase 04 thread via `/phase PASSED` |
 | 04 detail + login (wip, escalated) | DEFERRED (batch run) | OI-1 open; see `handoffs/phase-04/human-check.md` |
-| 05 layout toggle | DEFERRED (batch run) | see `handoffs/phase-05/human-check.md` |
+| 05 layout toggle (f7dff1f) | DEFERRED (batch run) | see `handoffs/phase-05/human-check.md` |
+| 06 release check | DEFERRED (batch run) | see `handoffs/phase-06/human-check.md` |

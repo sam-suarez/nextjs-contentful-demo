@@ -1,6 +1,6 @@
 # Phase 05: Human check
 
-**Status:** closed (commit: see `git log --grep "phase 05"`)
+**Status:** closed (commit `f7dff1f`)
 **Result:** DEFERRED (batch run)
 
 ## Escalation

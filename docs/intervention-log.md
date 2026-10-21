@@ -100,3 +100,12 @@ Append-only. Every "Where the instructions got in the way" item from each phase,
 | qa | Pre-build: ran `pkill -f next-server` during a manual curl check, which would also stop a human's dev server. No role file says not to |
 | ui | `useSearchParams` builds without `<Suspense>` only because `/` is dynamic (`instant = false`); if `/` ever became prerenderable, Next would demand a boundary (D-020 forbids it) |
 | reviewer | The diff can't show command output (boundary script, `ƒ` marker) or runtime behaviour; passed on code evidence plus qa's checks. Notes: the `layout` prop is effectively unused (URL always wins); repeated `?layout=` edge case unprobed; `<a role="button">` activates on Enter only |
+
+## Phase 06: release check (batch run)
+
+| Agent | Item |
+|---|---|
+| orchestrator | The phase plan says "qa only", but `agents/orchestrator.md` steps 2 and 4 assume a builder. Skipped both, ran qa in post-build mode, and still locked the tests (steps 3/5) |
+| orchestrator | The diff is empty (no builder, qa changed nothing), so the reviewer was not dispatched; the procedure has no rule for an empty diff |
+| qa | R7's "only R17 may fail" conflicts with `agents/qa.md` "overall PASS only if every check passes"; qa reported both readings (raw e2e FAIL, known OI-1 only; R7 PASS) |
+| qa | R9 "names only": `.env.example` has `CONTENTFUL_ENVIRONMENT=master` (public default); passed, flagged for the human |
