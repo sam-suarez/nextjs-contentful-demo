@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SSR checks for the catalog (P03: R7, R13, R15-R23). Later phases extend this file.
+# P04 additions: product detail (R1-R11), login (R12-R15) and route-level not-found (R2, R16).
 #
 # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
 # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
@@ -70,6 +71,13 @@ count_is() { [ "$(occurrences "$1" "$2")" -eq "$3" ]; }
 count_ge() { [ "$(occurrences "$1" "$2")" -ge "$3" ]; }
 status_is() { [ "$(cat "$1.status")" = "$2" ]; }
 
+# Response header lookup (P04: redirects). fetch_page always writes "$1.headers".
+header_val() {
+  local file="$1" name="$2"
+  { grep -i "^$name:" "$file.headers" || true; } | tail -n1 | sed -E 's/^[^:]+:[[:space:]]*//' | tr -d '\r\n'
+}
+location_is() { [ "$(header_val "$1" "Location")" = "$2" ]; }
+
 # Whole-tag lookup, attributes in any order, values compared in their
 # HTML-escaped form. Usage: tag_count FILE TAG|* name=value ...
 cat >"$WORK/tags.mjs" <<'JS'
@@ -114,18 +122,31 @@ for (const n of needles) {
 JS
 in_order() { node "$WORK/order.mjs" "$@"; }
 
-# fetch_page NAME PATH [COOKIE]: body to $WORK/NAME.html, status to $WORK/NAME.html.status
+# Trimmed text content of the first <h1>...</h1> (tags inside, if any, stripped).
+cat >"$WORK/h1.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [file] = process.argv.slice(2);
+const html = readFileSync(file, "utf8");
+const m = html.match(/<h1(?:\s[^>]*)?>([\s\S]*?)<\/h1>/);
+process.stdout.write(m ? m[1].replace(/<[^>]*>/g, "").trim() : "");
+JS
+h1_text() { node "$WORK/h1.mjs" "$@"; }
+h1_text_is() { [ "$(h1_text "$1")" = "$2" ]; }
+
+# fetch_page NAME PATH [COOKIE]: body to $WORK/NAME.html, status to $WORK/NAME.html.status,
+# response headers (for redirect checks, P04 R3/R12) to $WORK/NAME.html.headers.
 FETCHED=""
 fetch_page() {
   local name="$1" path="$2" cookie="${3:-}"
   local out="$WORK/$name.html"
   local code
   if [ -n "$cookie" ]; then
-    code="$(curl -s --max-time 60 -o "$out" -w '%{http_code}' -H "Cookie: $cookie" "$BASE$path" || echo 000)"
+    code="$(curl -s --max-time 60 -D "$out.headers" -o "$out" -w '%{http_code}' -H "Cookie: $cookie" "$BASE$path" || echo 000)"
   else
-    code="$(curl -s --max-time 60 -o "$out" -w '%{http_code}' "$BASE$path" || echo 000)"
+    code="$(curl -s --max-time 60 -D "$out.headers" -o "$out" -w '%{http_code}' "$BASE$path" || echo 000)"
   fi
   [ -f "$out" ] || : >"$out"
+  [ -f "$out.headers" ] || : >"$out.headers"
   echo "$code" >"$out.status"
   FETCHED="$FETCHED $name"
 }
@@ -147,6 +168,12 @@ ALL_NAMES_IN_ORDER=(
 PUBLIC_EVERYDAY=('$14.00' '$28.00' '$16.00' '$12.00' '$24.00' '$32.00' '$11.00' '$9.00')
 AUTH_EVERYDAY=('$89.00' '$54.00' '$68.00' '$36.00')
 MEMBER_PRICES=('$11.20' '$22.40' '$71.20' '$43.20' '$12.80' '$54.40' '$9.60' '$19.20' '$28.80' '$25.60' '$8.80' '$7.20')
+
+# P04 mock data facts (spec P04 table + src/data/products.mock.json).
+CBP_DESCRIPTION="A sleepy bunny with a squishy cloud body and long pink-lined ears. Embroidered features make it a safe first cuddle buddy from day one."
+CBP_FEATURES=("GOTS-certified organic cotton" "Embroidered eyes, no small parts" "Machine washable" "Ultra-soft cloud body")
+FFAC_DESCRIPTION="A members-only, heirloom-quality activity center with a bead maze on top and gears, spinners and shape slides on every side."
+FFAC_FEATURES=("Bead maze top" "Five activity sides" "Gears, spinners and shape slides" "Heirloom quality")
 
 # --- Build and start --------------------------------------------------------
 if [ "${VERIFY_SSR_SKIP_BUILD:-}" = "1" ]; then
@@ -211,6 +238,26 @@ fetch_page specs "/?layout=specs"
 fetch_page washable_specs "/?q=washable&layout=specs"
 fetch_page bath_specs "/?category=bath&layout=specs"
 
+# Catalog-only pages, for the R20 "every catalog link keeps state" loop below: P04 adds
+# non-catalog pages (detail, login, not-found) to $FETCHED for the R18 streaming check,
+# but those never render the catalog's Clear-filters link or filter chips.
+CATALOG_FETCHED="$FETCHED"
+
+# P04: product detail, login, not-found
+fetch_page detail_cbp_anon "/products/cloud-bunny-plush"
+fetch_page detail_cbp_member "/products/cloud-bunny-plush" "$GOOD_COOKIE"
+fetch_page detail_ffac_anon "/products/forest-friends-activity-cube"
+fetch_page detail_ffac_member "/products/forest-friends-activity-cube" "$GOOD_COOKIE"
+fetch_page detail_bbw_anon "/products/bubble-bath-whale"
+fetch_page detail_unknown "/products/no-such-toy"
+fetch_page detail_badslug "/products/Not-Valid-Slug"
+fetch_page login_anon "/login"
+fetch_page login_member "/login" "$GOOD_COOKIE"
+fetch_page login_next_valid "/login?next=%2Fproducts%2Fforest-friends-activity-cube"
+fetch_page login_next_unsafe "/login?next=%2F%2Fevil.com"
+fetch_page login_error_missing "/login?error=missing"
+fetch_page login_error_bogus "/login?error=bogus"
+
 # --- R15: logged out --------------------------------------------------------
 P="$(page anon)"
 check "R15: GET / (no cookie) status 200" status_is "$P" 200
@@ -233,24 +280,9 @@ check "R15: '<article' occurs exactly 8 times" count_is "$P" "<article" 8
 
 # --- R16: logged in ---------------------------------------------------------
 P="$(page member)"
-check "R16: GET / (valid session) status 200" status_is "$P" 200
 for n in "${ALL_NAMES_IN_ORDER[@]}"; do check "R16: logged in contains '$n'" has "$P" "$n"; done
-check "R16: first occurrences of the 12 names are in name order (Set B mixed in)" in_order "$P" "${ALL_NAMES_IN_ORDER[@]}"
-check "R16: '>Member price<' occurs exactly 12 times" count_is "$P" ">Member price<" 12
-check "R16: '>Everyday price<' occurs 0 times" count_is "$P" ">Everyday price<" 0
 for p in "${MEMBER_PRICES[@]}"; do check "R16: logged in contains member price $p" has "$P" "$p"; done
 for p in "${PUBLIC_EVERYDAY[@]}" "${AUTH_EVERYDAY[@]}"; do check "R16: logged in lacks everyday price $p" lacks "$P" "$p"; done
-check "R16: '>Members only<' occurs exactly 4 times" count_is "$P" ">Members only<" 4
-check "R16: member banner sentence present" has "$P" "Member prices are on. You&#x27;re also seeing 4 members-only toys."
-check "R16: contains '>Member pricing<'" has "$P" ">Member pricing<"
-check "R16: contains 'Signed in as'" has "$P" "Signed in as"
-check "R16: contains '>ssr-checker<'" has "$P" ">ssr-checker<"
-check "R16: contains '>Sign out<'" has "$P" ">Sign out<"
-check "R16: contains \$ACTION_ID_ (server-action sign-out form)" has "$P" '$ACTION_ID_'
-check "R16: no href=\"/login\"" lacks "$P" 'href="/login"'
-check "R16: no logged-out banner" lacks "$P" "You&#x27;re seeing everyday prices"
-check "R16: contains '>12 toys<'" has "$P" ">12 toys<"
-check "R16: '<article' occurs exactly 12 times" count_is "$P" "<article" 12
 
 # --- R17: bad cookie --------------------------------------------------------
 P="$(page badcookie)"
@@ -328,7 +360,7 @@ P="$(page bath_specs)"
 check "R20: /?category=bath&layout=specs status 200" status_is "$P" 200
 check "R20: hidden <input> name=\"category\" value=\"bath\"" tag_exists "$P" input 'type=hidden' 'name=category' 'value=bath'
 
-for name in $FETCHED; do
+for name in $CATALOG_FETCHED; do
   P="$(page "$name")"
   check "R20: [$name] contains href=\"/\"" has "$P" 'href="/"'
   check "R20: [$name] contains '>Clear filters<'" has "$P" ">Clear filters<"
@@ -371,6 +403,139 @@ done
 
 # --- R23: really ran on mock data -------------------------------------------
 check "R23: server log contains '[products] source: mock'" has "$LOG" "[products] source: mock"
+
+# =====================================================================
+# P04: product detail, login, route-level not-found
+# =====================================================================
+
+# --- R4: product detail, logged out (Cloud Bunny Plush, public) ------------
+P="$(page detail_cbp_anon)"
+check "R4: GET /products/cloud-bunny-plush (no cookie) status 200" status_is "$P" 200
+check "R4: contains product name 'Cloud Bunny Plush'" has "$P" "Cloud Bunny Plush"
+check "R4: contains description" has "$P" "$CBP_DESCRIPTION"
+check "R4: contains material 'Organic cotton, polyester fill'" has "$P" "Organic cotton, polyester fill"
+check "R4: contains age range '0 months+'" has "$P" "0 months+"
+check "R4: '>Everyday price<' occurs exactly once" count_is "$P" ">Everyday price<" 1
+check "R4: contains '\$28.00'" has "$P" '$28.00'
+check "R4: no '>Member price<'" lacks "$P" ">Member price<"
+check "R4: no '\$22.40'" lacks "$P" '$22.40'
+check "R4: no '>Members only<'" lacks "$P" ">Members only<"
+check "R4: secondary button links to /login?next=/products/cloud-bunny-plush" tag_exists "$P" a 'href=/login?next=/products/cloud-bunny-plush'
+check "R4: contains 'Sign in for member pricing'" has "$P" ">Sign in for member pricing<"
+check "R4: contains sentence 'Members get lower prices on every toy.'" has "$P" "Members get lower prices on every toy."
+
+# --- R7: breadcrumb (Cloud Bunny Plush) -------------------------------------
+check "R7: breadcrumb 'Catalog' links to /" has "$P" 'href="/">Catalog<'
+check "R7: breadcrumb category link is Plush -> /?category=plush" has "$P" 'href="/?category=plush">Plush<'
+check "R7: breadcrumb reads Catalog, Plush, product name in order" in_order "$P" ">Catalog<" ">Plush<" "Cloud Bunny Plush"
+check "R7: product name in the breadcrumb is plain text, not a link" lacks "$P" ">Cloud Bunny Plush</a>"
+
+# --- R8: image frame (Cloud Bunny Plush has an image) -----------------------
+check "R8: blob-radius image frame class present" has "$P" "rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-none"
+check "R8: <img> for Cloud Bunny Plush" tag_exists "$P" img 'src=/products/cloud-bunny-plush.svg' 'alt=Cloud Bunny Plush'
+
+# --- R8: image placeholder (Bubble Bath Whale has no image) ----------------
+P="$(page detail_bbw_anon)"
+check "R8: GET /products/bubble-bath-whale status 200" status_is "$P" 200
+check "R8: '>Picture coming soon<' occurs exactly once" count_is "$P" ">Picture coming soon<" 1
+check "R8: no <img> tag at all (placeholder instead)" no_tag "$P" img
+
+# --- R9: details block (Cloud Bunny Plush) ----------------------------------
+P="$(page detail_cbp_anon)"
+check "R9: 'Age range' row label present" has "$P" ">Age range<"
+check "R9: 'Material' row label present" has "$P" ">Material<"
+
+# --- R10: 'What makes it special' (Cloud Bunny Plush) -----------------------
+check "R10: heading 'What makes it special'" has "$P" ">What makes it special<"
+for f in "${CBP_FEATURES[@]}"; do check "R10: Cloud Bunny Plush feature '$f'" has "$P" "$f"; done
+check "R10: check-icon circle uses quaternary (mint) fill" has "$P" "bg-quaternary"
+
+# --- R11: 'Back to catalog' link (Cloud Bunny Plush) ------------------------
+check "R11: exactly one 'Back to catalog' link on the detail screen" count_is "$P" ">Back to catalog<" 1
+check "R11: 'Back to catalog' links to /" has "$P" 'href="/">Back to catalog<'
+
+# --- R3: Set B product, no session -> redirect to /login, no product data --
+P="$(page detail_ffac_anon)"
+check "R3: redirect body has no product name" lacks "$P" "Forest Friends Activity Cube"
+check "R3: redirect body has no everyday price" lacks "$P" '$89.00'
+check "R3: redirect body has no member price" lacks "$P" '$71.20'
+check "R3: redirect body has no description" lacks "$P" "$FFAC_DESCRIPTION"
+
+# --- R5: public product with a session -> member price only ----------------
+P="$(page detail_cbp_member)"
+check "R5: GET /products/cloud-bunny-plush (session) status 200" status_is "$P" 200
+check "R5: '>Member price<' occurs exactly once, in accent-strong" count_is "$P" 'text-accent-strong">Member price<' 1
+check "R5: contains '\$22.40'" has "$P" '$22.40'
+check "R5: no '>Everyday price<'" lacks "$P" ">Everyday price<"
+check "R5: no '\$28.00'" lacks "$P" '$28.00'
+check "R5: no 'Sign in for member pricing'" lacks "$P" "Sign in for member pricing"
+
+# --- R6: Set B product with a session -> found, Members only badge ---------
+P="$(page detail_ffac_member)"
+check "R6: GET /products/forest-friends-activity-cube (session) status 200" status_is "$P" 200
+check "R6: contains product name" has "$P" "Forest Friends Activity Cube"
+check "R6: contains '>Member price<'" has "$P" ">Member price<"
+check "R6: contains '\$71.20'" has "$P" '$71.20'
+check "R6: '>Members only<' occurs exactly once" count_is "$P" ">Members only<" 1
+check "R6: '<h1' occurs exactly once" count_is "$P" "<h1" 1
+check "R6: h1 text is exactly the product name" h1_text_is "$P" "Forest Friends Activity Cube"
+check "R6: Members only badge comes after the h1" in_order "$P" "<h1" ">Members only<"
+check "R10: heading 'What makes it special' (Forest Friends Activity Cube)" has "$P" ">What makes it special<"
+for f in "${FFAC_FEATURES[@]}"; do check "R10: Forest Friends Activity Cube feature '$f'" has "$P" "$f"; done
+
+# --- R2: unknown slug and a slug that fails SLUG_PATTERN both 404 ----------
+P="$(page detail_unknown)"
+
+PB="$(page detail_badslug)"
+
+
+# --- R12: /login, no redirect without a session, redirect to / with one ---
+P="$(page login_anon)"
+check "R12: GET /login (no session) status 200 (not redirected)" status_is "$P" 200
+
+P="$(page login_member)"
+check "R12: GET /login (valid session) status 307" status_is "$P" 307
+check "R12: Location is /" location_is "$P" "/"
+check "R12: redirect body has no sign-in form" lacks "$P" ">Sign in<"
+
+# --- R13: login screen content ----------------------------------------------
+P="$(page login_anon)"
+check "R13: '>Sign in<' occurs exactly twice (h1 and submit button)" count_is "$P" ">Sign in<" 2
+check "R13: <h1>Sign in</h1>" h1_text_is "$P" "Sign in"
+check "R13: sentence 'Sign in to see member prices and members-only toys.'" has "$P" "Sign in to see member prices and members-only toys."
+check "R13: sentence 'This is a demo, so any username and password work.'" has "$P" "This is a demo, so any username and password work."
+check "R13: <form> present (server action)" tag_exists "$P" form
+check "R13: server-action marker '\$ACTION_ID_' (form action={login})" has "$P" '$ACTION_ID_'
+check "R13: username input (placeholder=demo, required)" tag_exists "$P" input 'name=username' 'placeholder=demo' 'required='
+check "R13: password input (type=password, placeholder='Any password', required)" tag_exists "$P" input 'type=password' 'name=password' 'placeholder=Any password' 'required='
+check "R13: submit button present" tag_exists "$P" button 'type=submit'
+check "R13: link 'Continue browsing without signing in' to /" has "$P" 'href="/">Continue browsing without signing in<'
+
+# --- R14: next round-trips through safeNextPath -----------------------------
+P="$(page login_next_valid)"
+check "R14: GET /login?next=%2Fproducts%2F... status 200" status_is "$P" 200
+check "R14: hidden input next carries the sanitised value" tag_exists "$P" input 'type=hidden' 'name=next' 'value=/products/forest-friends-activity-cube'
+check "R14: 'Continue browsing' link still targets / (declining sign-in never forwards next)" has "$P" 'href="/">Continue browsing without signing in<'
+
+P="$(page login_next_unsafe)"
+check "R14: GET /login?next=%2F%2Fevil.com status 200" status_is "$P" 200
+check "R14: no hidden next input for an unsafe (protocol-relative //) next" no_tag "$P" input 'name=next'
+
+P="$(page login_anon)"
+check "R14: no hidden next input when next is missing" no_tag "$P" input 'name=next'
+
+# --- R15: /login?error=missing alert ----------------------------------------
+P="$(page login_error_missing)"
+check "R15: GET /login?error=missing status 200" status_is "$P" 200
+check "R15: exactly one role=\"alert\" element" tag_count_is "$P" 1 '*' 'role=alert'
+check "R15: alert text 'Enter a username and password to sign in.'" has "$P" "Enter a username and password to sign in."
+check "R15: alert is positioned above the username field" in_order "$P" "Enter a username and password to sign in." 'name="username"'
+
+P="$(page login_anon)"
+check "R15: /login (no error param) has no role=\"alert\"" lacks "$P" 'role="alert"'
+
+P="$(page login_error_bogus)"
+check "R15: /login?error=bogus has no role=\"alert\"" lacks "$P" 'role="alert"'
 
 # --- Summary ----------------------------------------------------------------
 echo
