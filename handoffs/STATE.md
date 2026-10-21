@@ -7,11 +7,11 @@ Owned by the orchestrator (`agents/orchestrator.md`). No other agent opens this 
 | Field | Value |
 |---|---|
 | Phase | 08 release check |
-| Status | spec <!-- not started / spec / build / review / done / escalated --> |
+| Status | done <!-- not started / spec / build / review / done / escalated --> |
 | Build round | 0 (qa only) |
-| Base commit | 5f15cd8 |
-| Next step | 1 (spec) for phase 08, same thread (D-026 suspended by the human) |
-| Open escalation | none blocking (OI-2 non-blocking). Batch-run thread 2: 07 closed; still to do: 08 release check → `handoffs/VERIFY.md` |
+| Base commit | b6b3a9d |
+| Next step | none planned. Human: work through `handoffs/VERIFY.md`, then decide OI-2 and the phase 07 layout changes |
+| Open escalation | none blocking. OI-2 open (non-blocking); phase 07 layout changes await sign-off |
 
 ## Phase plan
 
@@ -26,8 +26,8 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 05 layout toggle | ui | done (1 round used) | `feat(layout): phase 05 - layout toggle` |
 | 06 release check | qa only | done (all PASS except R17/OI-1; no fix phases) | `test(release): phase 06 - release check` |
 | 04-fix1 proxy redirect (OI-1) | data-auth | done (1 round used; 1 dispute) | `feat(auth): phase 04-fix1 - proxy redirect for members-only slugs` (5f15cd8) |
-| 07 suspense skeletons | ui | done (2 rounds used) | `feat(ui): phase 07 - suspense skeletons` |
-| 08 release check | qa only | spec |  |
+| 07 suspense skeletons | ui | done (2 rounds used) | `feat(ui): phase 07 - suspense skeletons` (b6b3a9d) |
+| 08 release check | qa only | done (all PASS; no fix phases) | `test(release): phase 08 - release check` |
 
 ## Human checks
 
@@ -42,3 +42,4 @@ Run in order, one phase per thread, each ending at the human gate (D-026). Excep
 | 06 release check | DEFERRED (batch run) | see `handoffs/phase-06/human-check.md` |
 | 04-fix1 proxy redirect | DEFERRED (batch run) | see `handoffs/phase-04-fix1/human-check.md`; OI-2 open (non-blocking) |
 | 07 suspense skeletons | DEFERRED (batch run) | see `handoffs/phase-07/human-check.md`; 5 visible layout changes need sign-off |
+| 08 release check | DEFERRED (batch run) | see `handoffs/phase-08/human-check.md` |
