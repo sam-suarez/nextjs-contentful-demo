@@ -58,6 +58,16 @@ All checks use the mock data and their own session secret, so they don't depend 
 
 For a manual pass in the browser, use [docs/manual-qa.md](docs/manual-qa.md).
 
+## Add a feature with the agents
+
+In Claude Code at the repo root, with `gh` logged in:
+
+```
+/ship add a wishlist feature
+```
+
+The orchestrator asks you the architecture and design questions the feature raises, the architect agent writes your answers into the docs, and the build phases run test-first with a check from you after each one. It ends by opening a pull request for you to merge. Run `/ship` with no argument to resume. Details: [AGENT.md](AGENT.md) section 7.
+
 ## Deploy
 
 Deployed on Vercel: https://nextjs-contentful-demo.vercel.app. To deploy your own copy, import the repository, set `SESSION_SECRET` (and the `CONTENTFUL_*` variables for live content), and deploy with the default Next.js settings.
@@ -68,8 +78,8 @@ Deployed on Vercel: https://nextjs-contentful-demo.vercel.app. To deploy your ow
 |---|---|
 | `src/` | The app: routes in `src/app`, server components in `src/components`, the only client island in `src/components/client`, server-only data and auth in `src/lib` |
 | `agents/` | The agent team, one Markdown file per role. Start with `orchestrator.md` |
-| `.claude/` | What makes the agents runnable in Claude Code: thin subagent wrappers, path-scoped rules, hooks and the `/phase` command |
-| `handoffs/` | The pipeline's working files: one folder per phase (spec, qa, build, review, human check), the current state, the round log and the escalations |
+| `.claude/` | What makes the agents runnable in Claude Code: thin subagent wrappers, path-scoped rules, hooks and the `/ship` command |
+| `handoffs/` | The pipeline's working files: one folder per feature (intake, docs review, PR body) and per phase (spec, qa, build, review, human check), the current state, the round log and the escalations |
 | `docs/` | Architecture, design spec, decision log, intervention log and the condensed assessment brief |
 | `AGENT.md` | The write-up: architecture, prompting strategy, trade-offs and manual interventions |
 | `AGENTS.md` | Managed by Next.js (`next dev` rewrites it); tells any coding agent to read the bundled Next.js 16 docs. Not the write-up |

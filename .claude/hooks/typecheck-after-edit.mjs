@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 
 const input = JSON.parse(readFileSync(0, "utf8"));
 const role = input.agent_type;
-if (!["data-auth", "ui", "qa", "qa-run"].includes(role)) process.exit(0);
+if (!["data-auth", "ui", "qa", "qa-run", "architect"].includes(role)) process.exit(0);
 const isQa = role === "qa" || role === "qa-run";
 const file = input.tool_input?.file_path ?? "";
 if (!/\.(ts|tsx|mts|cts)$/.test(file)) process.exit(0);

@@ -13,6 +13,7 @@ Decision IDs (`D-0xx`) point to [docs/decisions.md](docs/decisions.md). The raw 
 | **data-auth** ([agents/data-auth.md](agents/data-auth.md)) | `src/lib/**`, `src/proxy.ts`, `.env.example` | Session, login, the data access layer, the Contentful and mock adapters, filtering |
 | **ui** ([agents/ui.md](agents/ui.md)) | `src/app/**`, `src/components/**`, `next.config.ts` | Routes and components, with prices and members-only content rendered on the server |
 | **reviewer** ([agents/reviewer.md](agents/reviewer.md)) | nothing | Context-blind and read-only. Judges the diff against the spec and returns PASS, REVISE or BLOCK per requirement |
+| **architect** ([agents/architect.md](agents/architect.md)), *added after the build (D-035)* | `docs/architecture.md`, `docs/design.md`, `docs/decisions.md`, `.claude/rules/`, `src/schemas/`, `src/data/` | Writes the human's recorded decisions for a new feature into the docs. Transcribes, never decides. See section 7 |
 
 **Why these five (D-023).** Ownership follows the code's natural boundaries: the server-only layer, the rendering layer and the tests. Each agent gets exactly the rules for its paths, and no two agents edit the same file. Three roles (builder, tester, reviewer) would drift back to one monolithic builder, which the brief rules out. Seven or more would add handoffs and cold starts for areas of a handful of files. The orchestrator is the main Claude Code session rather than a subagent, because subagents can't start subagents.
 
@@ -36,7 +37,7 @@ All role files share one template ([agents/_template.md](agents/_template.md)): 
 
 The orchestrator passes agents **paths, not content**, so each subagent starts with a small, predictable context. Pipeline state lives in [handoffs/STATE.md](handoffs/STATE.md) (current state only), [handoffs/CONTRACTS.md](handoffs/CONTRACTS.md) (each phase's contract as built, for the phases that depend on it) and [handoffs/LOG.md](handoffs/LOG.md) (append-only round history).
 
-**One phase per thread, with a human gate (D-026).** Each phase ends with a commit and a `human-check.md`, then the thread stops. A fresh thread starts the next phase with `/phase PASSED` (or `FAILED: …`). This keeps each orchestrator context small and proves the files alone are enough to resume. The build ran across about ten threads with no shared memory beyond the repo.
+**One phase per thread, with a human gate (D-026).** Each phase ends with a commit and a `human-check.md`, then the thread stops. A fresh thread starts the next phase with `/phase PASSED` (or `FAILED: …`). This keeps each orchestrator context small and proves the files alone are enough to resume. The build ran across about ten threads with no shared memory beyond the repo. After the build, `/phase` was replaced by `/ship` (section 7).
 
 **Bounded rounds.** A REVISE goes back to the builder at most twice. A BLOCK, or a third failed round, stops the phase and escalates to the human with options. The pipeline never quietly lowers the bar to get green.
 
@@ -97,7 +98,23 @@ No application code was edited by hand after the pipeline started. Every commit 
 
 1. **Prototype the riskiest route before writing the architecture.** OI-1 came from one wrong assumption about the framework. A one-hour probe build of the detail route would have caught it before phase 04.
 2. **Close the path guard's shell gap.** The guard covers Edit and Write but not writes through Bash. Today the reviewer and the test checksum are the backstop.
-3. **Let the human's decision reach the protected docs.** Every architecture change cost an extra thread, because no agent may edit architecture.md. A small "architect" step that applies a recorded human decision, with its own review, would fix that.
+3. **Let the human's decision reach the protected docs.** Every architecture change cost an extra thread, because no agent may edit architecture.md. A small "architect" step that applies a recorded human decision, with its own review, would fix that. **Done after the build: `/ship` and the architect agent (section 7, D-035).**
 4. **Allow more than one builder per phase**, with an explicit handoff between them. Fix phases kept needing it.
 5. **CI and deployment.** Run the same checks in GitHub Actions on every push, and deploy previews on Vercel.
 6. **Real 404 status for unknown slugs,** probably via the proxy or `generateStaticParams`, and visual regression tests for the two layouts.
+
+## 7. After the build: `/ship` replaces `/phase` (D-035)
+
+`/phase PASSED` worked for a planned build: each thread opened with the human's verdict on the previous phase. It read badly for new work after the plan had finished, and every architecture change still needed the human to edit the protected docs by hand. New work now starts with one command:
+
+```
+/ship add a wishlist feature
+```
+
+1. **Interview.** The orchestrator reads the architecture and design docs, works out what the feature needs that they don't settle (storage, who sees it, rendering and the client boundary, routes, data model, exact copy), and asks the human, with a recommended option first. It writes the answers to `handoffs/feature-<slug>/intake.md`, and the human confirms them.
+2. **Architect.** A new agent writes those answers into `docs/architecture.md`, `docs/design.md`, `docs/decisions.md` and the path-scoped rules, plus any schema, mock or Contentful change the intake lists. It transcribes; anything the intake doesn't answer goes back to the human.
+3. **Docs review.** The reviewer, in a new docs mode, checks the doc diff against the intake: everything recorded, nothing invented, no hard rule broken by accident. Then the human approves the diff, and it is committed.
+4. **Build.** The same phase steps as before (spec, test-first, lock, build, verify, review), several phases in one thread, with the human check asked in the thread.
+5. **Pull request.** The feature ends on its own branch, pushed with a PR that the human merges. The next `/ship` asks GitHub whether it was merged, so nothing has to react to the merge, and only merged docs ever reach `main`, where every new feature starts.
+
+The orchestrator still never decides architecture: the human decides, the architect writes it down, the reviewer checks the writing. One feature is in flight at a time. Contentful has no branches and the deployed site reads the same space, so the architect may only make additive changes there, each confirmed by the human as "live before merge".

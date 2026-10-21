@@ -2,7 +2,26 @@
 
 Owned by the orchestrator (`agents/orchestrator.md`). No other agent opens this file (D-024). Kept short on purpose (D-033): phase scope and contracts as built are in `handoffs/CONTRACTS.md`, the round history is appended to `handoffs/LOG.md`.
 
-## Current
+## Feature in flight
+
+One at a time (D-035). `/ship <feature>` fills this table; `/ship` with no argument resumes from it. After a PR is opened, the status stays `pr-open` until the next `/ship` looks the PR up with `gh` and records the merge.
+
+| Field | Value |
+|---|---|
+| Feature | none |
+| Slug / branch | n/a |
+| Base commit | n/a |
+| Status | none <!-- none / interview / docs / build / escalated / pr-open --> |
+| Step | n/a <!-- orchestrator step to resume at, e.g. A3, phase 09 step 4, C3 --> |
+| Architect round | n/a |
+
+## Features
+
+| Feature | Decision | Phases | Branch | PR | Status |
+|---|---|---|---|---|---|
+| (none yet) | | | | | |
+
+## Current phase
 
 | Field | Value |
 |---|---|
@@ -10,12 +29,12 @@ Owned by the orchestrator (`agents/orchestrator.md`). No other agent opens this 
 | Status | done <!-- not started / spec / build / review / done / escalated --> |
 | Build round | n/a |
 | Base commit | 841459a (04-fix2, the last phase) |
-| Next step | none planned. Write-up in `AGENT.md`; manual release checklist in `docs/manual-qa.md` |
+| Next step | none planned. New work starts with `/ship <feature>` (D-035); the next phase number is 09 |
 | Open escalation | none. OI-1 and OI-2 closed (`handoffs/ESCALATIONS.md`) |
 
 ## Phase plan
 
-Run in the order below, one phase per thread, each ending at the human gate (D-026). From phase 04 round 3 on, the human suspended D-026 for three threads and ran several phases per thread, deferring the human checks to one batch check (intervention log: "Batch run", "Resume thread", "Batch-run thread 2").
+Phases 01–08 and the two fix phases were run with `/phase`, one phase per thread, each ending at the human gate (D-026; `/phase` retired by D-035). New phases are added by `/ship` at step A7, numbered from 09, and run in one thread per feature with the human check asked in the thread. From phase 04 round 3 on, the human suspended D-026 for three threads and ran several phases per thread, deferring the human checks to one batch check (intervention log: "Batch run", "Resume thread", "Batch-run thread 2").
 
 | Phase | Builder | Status | Commit |
 |---|---|---|---|

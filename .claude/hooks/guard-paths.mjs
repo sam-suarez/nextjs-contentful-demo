@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // PreToolUse guard: turns each role's Paths table (agents/<role>.md) into a hard limit.
 // Usage: node guard-paths.mjs              (.claude/settings.json: role = the subagent's agent_type)
-//        node guard-paths.mjs orchestrator (.claude/skills/phase/SKILL.md: main-session calls only)
+//        node guard-paths.mjs orchestrator (.claude/skills/ship/SKILL.md: main-session calls only)
 // Writes outside the role's owned paths and reads of its "never open" files are denied (exit 2).
 // Bash writes are not covered: the reviewer's G1 check on the diff is the backstop.
 import { readFileSync } from "node:fs";
@@ -32,6 +32,20 @@ const ROLES = {
     noWrite: QA_OWNED,
     noRead: ORCH_ONLY,
   },
+  // D-035: records the human's feature decisions in the source-of-truth docs, schema and mock.
+  architect: {
+    write: [
+      "docs/architecture.md",
+      "docs/design.md",
+      "docs/decisions.md",
+      ".claude/rules/*.md",
+      "src/schemas/**",
+      "src/data/**",
+      "handoffs/feature-*/architect.md",
+    ],
+    noWrite: QA_OWNED,
+    noRead: ORCH_ONLY,
+  },
   qa: QA,
   "qa-run": QA, // same role as qa on a cheaper model (D-033)
   reviewer: {
@@ -40,8 +54,12 @@ const ROLES = {
       "agents/reviewer.md",
       "handoffs/phase-*/spec.md",
       "handoffs/phase-*/diff.patch",
+      // D-035 docs mode: the human's decisions and the architect's diff (never architect.md).
+      "handoffs/feature-*/intake.md",
+      "handoffs/feature-*/docs.patch",
       "docs/architecture.md",
       "docs/design.md",
+      "docs/decisions.md",
       ".claude/rules",
       ".claude/rules/*.md",
       // D-033: the current code around a hunk; handoffs/ stays closed (D-013 item 1).
@@ -63,7 +81,7 @@ if (explicit && !ROLES[explicit]) {
   console.error(`guard-paths: unknown role "${explicit}". Fix the hook registration.`);
   process.exit(2); // fail closed: a misconfigured guard blocks instead of waving everything through
 }
-// The orchestrator guard (from /phase) is session-wide, so it judges main-session calls only and
+// The orchestrator guard (from /ship) is session-wide, so it judges main-session calls only and
 // leaves subagent calls to the settings.json registration. Agents outside the roster are not ours.
 if (explicit === "orchestrator" && input.agent_type) process.exit(0);
 const role = explicit ?? input.agent_type;

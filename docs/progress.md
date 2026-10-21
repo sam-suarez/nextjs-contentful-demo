@@ -66,3 +66,6 @@
 - Playwright: configured and Chromium installed by qa in P04.
 - Whether Claude Code applies `.claude/rules/` inside subagents was never settled; it doesn't matter, because each builder's role file tells it to read its rules explicitly.
 - Hooks did fire in `/phase` threads. Threads started from a pasted prompt ran with the orchestrator path guard off (intervention log), which led to `/phase` becoming the only entry point (D-033).
+
+## After submission
+- D-035: `/ship <feature>` replaces `/phase`. The orchestrator interviews the human, a new architect agent writes the answers into the protected docs (and schema, mock, additive Contentful changes), the reviewer checks the doc diff in docs mode, the build phases run with in-thread human checks, and the feature ends in a pull request the human merges. One feature in flight at a time.
