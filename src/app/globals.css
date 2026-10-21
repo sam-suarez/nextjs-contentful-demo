@@ -1,26 +1,170 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Design tokens (docs/design.md, D-005). Light mode only. */
+@theme {
+  --color-background: #FFFDF5;
+  --color-foreground: #1E293B;
+  --color-muted: #F1F5F9;
+  --color-muted-foreground: #64748B;
+  --color-accent: #8B5CF6;
+  --color-accent-strong: #7C3AED;
+  --color-secondary: #F472B6;
+  --color-tertiary: #FBBF24;
+  --color-quaternary: #34D399;
+  --color-sky: #38BDF8;
+  --color-tangerine: #FB923C;
+  --color-border: #E2E8F0;
+  --color-input-border: #CBD5E1;
+  --color-card: #FFFFFF;
+  --color-input: #FFFFFF;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --shadow-pop-sm: 2px 2px 0 0 var(--color-foreground);
+  --shadow-pop: 4px 4px 0 0 var(--color-foreground);
+  --shadow-pop-lg: 6px 6px 0 0 var(--color-foreground);
+  --shadow-pop-accent: 4px 4px 0 0 var(--color-accent);
+  --shadow-sticker: 8px 8px 0 0 var(--color-border);
+  --shadow-sticker-member: 8px 8px 0 0 var(--color-secondary);
+  --shadow-sticker-hover: 12px 12px 0 0 var(--color-border);
+  --shadow-sticker-member-hover: 12px 12px 0 0 var(--color-secondary);
+
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale, ratio 1.25 */
+  --text-label: 0.8rem;
+  --text-title: 3.05rem;
+  --text-title-sm: 1.953rem;
+
+  --animate-pop-in: pop-in 400ms var(--ease-bounce);
+  --animate-wiggle: wiggle 400ms var(--ease-bounce);
+
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    33% {
+      transform: rotate(3deg);
+    }
+    66% {
+      transform: rotate(-3deg);
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  body {
+    background-color: var(--color-background);
+    /* Dot grid: 1.5px border-coloured dots every 24px (docs/design.md Texture). */
+    background-image: radial-gradient(var(--color-border) 1.5px, transparent 1.5px);
+    background-size: 24px 24px;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+}
+
+/*
+ * Focus ring (docs/design.md Accessibility, R31). Deliberately unlayered: unlayered rules
+ * beat every @layer (base, components, utilities), so the 2px accent outline and the hard
+ * accent shadow win over .btn-pop (incl. :hover/:active), .sticker and any shadow-* or
+ * outline-* utility an element carries at rest.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-pop-accent);
+}
+
+@layer components {
+  /* In-card dot backdrop, tinted with --tint (set per category). */
+  .tint-dots {
+    background-image: radial-gradient(var(--tint) 1.5px, transparent 1.5px);
+    background-size: 14px 14px;
+  }
+
+  /* Hard pop shadows shrink to 2px below md (docs/design.md Responsive). */
+  .btn-pop {
+    box-shadow: var(--shadow-pop-sm);
+    transition:
+      translate 300ms var(--ease-bounce),
+      box-shadow 300ms var(--ease-bounce),
+      background-color 150ms ease;
+  }
+  @media (min-width: 48rem) {
+    .btn-pop {
+      box-shadow: var(--shadow-pop);
+    }
+  }
+  .btn-pop:hover {
+    box-shadow: var(--shadow-pop-lg);
+  }
+  .btn-pop:active {
+    box-shadow: var(--shadow-pop-sm);
+  }
+
+  .sticker {
+    box-shadow: var(--shadow-sticker);
+  }
+  .sticker-member {
+    box-shadow: var(--shadow-sticker-member);
+  }
+  .sticker-card {
+    transition:
+      rotate 300ms var(--ease-bounce),
+      scale 300ms var(--ease-bounce),
+      box-shadow 300ms var(--ease-bounce);
+  }
+  .sticker-card.sticker:hover {
+    box-shadow: var(--shadow-sticker-hover);
+  }
+  .sticker-card.sticker-member:hover {
+    box-shadow: var(--shadow-sticker-member-hover);
+  }
+}
+
+/*
+ * Motion only when the visitor allows it (docs/design.md Motion). Without it every card
+ * is fully visible: no pop-in, no fill mode, no wiggle, no rotate, no button translate.
+ * The pop-in animates `transform`; hover uses the separate `rotate` / `scale` properties,
+ * so the filled keyframe end state (scale(1)) never cancels the hover.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .pop-in {
+    animation: var(--animate-pop-in);
+    animation-fill-mode: both;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+
+  .sticker-card:hover {
+    rotate: -1deg;
+    scale: 1.02;
+  }
+
+  .sticker-card:hover .wiggle {
+    animation: var(--animate-wiggle);
+  }
+
+  .btn-pop:hover {
+    translate: -2px -2px;
+  }
+  .btn-pop:active {
+    translate: 2px 2px;
+  }
 }
