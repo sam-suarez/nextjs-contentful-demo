@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # SSR checks for the catalog (P03: R7, R13, R15-R23). Later phases extend this file.
 # P04 additions: product detail (R1-R11), login (R12-R15) and route-level not-found (R2, R16).
-# P05 additions: layout toggle island (P05 R3, R5, R6; R14 via the R18 loop).
+# P05 additions: layout toggle island (P05 R3, R5, R6).
 # P04-fix1 additions: proxy 307 for members-only slugs (R4, R10) and the slug-cache log (R11).
+# P07 (D-031): the R18 loop (no streaming wrappers, no fallback / "Loading" text) is removed.
+# Streamed content is part of the response body and counts as present (P07 R11, R12).
 #
 # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
 # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
@@ -313,9 +315,9 @@ fetch_page bath_specs "/?category=bath&layout=specs"
 fetch_page bogus "/?layout=bogus"
 fetch_page specs_member "/?layout=specs" "$GOOD_COOKIE"
 
-# Catalog-only pages, for the R20 "every catalog link keeps state" loop below: P04 adds
-# non-catalog pages (detail, login, not-found) to $FETCHED for the R18 streaming check,
-# but those never render the catalog's Clear-filters link or filter chips.
+# Catalog-only pages, for the R20 "every catalog link keeps state" loop below: the pages
+# fetched after this point (detail, login, not-found) never render the catalog's
+# Clear-filters link or filter chips.
 CATALOG_FETCHED="$FETCHED"
 
 # P04: product detail, login, not-found
@@ -475,15 +477,6 @@ check "R7: footer text 'Tiny Confetti demo catalog'" has "$P" "Tiny Confetti dem
 check "R7: footer text 'Prices in USD. Member prices need sign-in.'" has "$P" "Prices in USD. Member prices need sign-in."
 check "R7: '<footer' occurs at least once" count_ge "$P" "<footer" 1
 
-# --- R18 (and R13): no streaming, no fallback, on every fetched page --------
-for name in $FETCHED; do
-  P="$(page "$name")"
-  check "R18: [$name] no '<div hidden id=\"S:'" lacks "$P" '<div hidden id="S:'
-  check "R18: [$name] no pending boundary '<!--\$?-->'" lacks "$P" '<!--$?-->'
-  check "R18: [$name] no '<template id=\"B:'" lacks "$P" '<template id="B:'
-  check "R18: [$name] no 'Loading'" lacks "$P" "Loading"
-done
-
 # --- R23: really ran on mock data -------------------------------------------
 check "R23: server log contains '[products] source: mock'" has "$LOG" "[products] source: mock"
 
@@ -510,7 +503,9 @@ check "R4: contains sentence 'Members get lower prices on every toy.'" has "$P" 
 # --- R7: breadcrumb (Cloud Bunny Plush) -------------------------------------
 check "R7: breadcrumb 'Catalog' links to /" has "$P" 'href="/">Catalog<'
 check "R7: breadcrumb category link is Plush -> /?category=plush" has "$P" 'href="/?category=plush">Plush<'
-check "R7: breadcrumb reads Catalog, Plush, product name in order" in_order "$P" ">Catalog<" ">Plush<" "Cloud Bunny Plush"
+# Needles are anchored to element text (">...<", as in R22): with the detail body streamed
+# (P07 R6), the RSC flight data that precedes the boundary's HTML also carries the bare name.
+check "R7: breadcrumb reads Catalog, Plush, product name in order" in_order "$P" ">Catalog<" ">Plush<" ">Cloud Bunny Plush<"
 check "R7: product name in the breadcrumb is plain text, not a link" lacks "$P" ">Cloud Bunny Plush</a>"
 
 # --- R8: image frame (Cloud Bunny Plush has an image) -----------------------

@@ -1,5 +1,6 @@
 import { LayoutGrid } from "@/components/client/layout-toggle";
 import { ProductCard } from "@/components/product-card";
+import { PRODUCT_GRID_COLUMNS } from "@/components/ui-classes";
 import type { CatalogProduct } from "@/lib/products/types";
 
 /**
@@ -10,7 +11,7 @@ import type { CatalogProduct } from "@/lib/products/types";
 export function ProductGrid({ products }: { products: CatalogProduct[] }) {
   return (
     <LayoutGrid>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 group-data-[layout=specs]:sm:grid-cols-1 group-data-[layout=specs]:md:grid-cols-2 group-data-[layout=specs]:lg:grid-cols-2 group-data-[layout=specs]:xl:grid-cols-2">
+      <div className={`${PRODUCT_GRID_COLUMNS} group-data-[layout=specs]:sm:grid-cols-1 group-data-[layout=specs]:md:grid-cols-2 group-data-[layout=specs]:lg:grid-cols-2 group-data-[layout=specs]:xl:grid-cols-2`}>
         {products.map((product, index) => (
           <ProductCard key={product.id} product={product} index={index} />
         ))}

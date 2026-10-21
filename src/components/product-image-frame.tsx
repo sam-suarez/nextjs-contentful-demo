@@ -2,7 +2,7 @@ import { ImageOff } from "lucide-react";
 import Image from "next/image";
 
 import { CATEGORY_META } from "@/components/categories";
-import { COLOR_CLASSES } from "@/components/ui-classes";
+import { COLOR_CLASSES, IMAGE_BOX } from "@/components/ui-classes";
 import type { ProductImage } from "@/lib/products/types";
 import type { Category } from "@/schemas/product";
 
@@ -31,7 +31,7 @@ export function ProductImageFrame({
   if (!image) {
     return (
       <div
-        className={`flex aspect-square w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-input-border bg-muted p-3 text-center ${radius} ${className}`}
+        className={`${IMAGE_BOX} flex flex-col items-center justify-center gap-2 border-2 border-dashed border-input-border bg-muted p-3 text-center ${radius} ${className}`}
       >
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-input-border bg-card text-muted-foreground">
           <ImageOff aria-hidden="true" strokeWidth={2.5} className="h-6 w-6" />
@@ -43,7 +43,7 @@ export function ProductImageFrame({
 
   const tint = COLOR_CLASSES[CATEGORY_META[category].color].tint;
   return (
-    <div className={`tint-dots aspect-square w-full overflow-hidden border-2 border-foreground ${tint} ${radius} ${className}`}>
+    <div className={`${IMAGE_BOX} tint-dots overflow-hidden border-2 border-foreground ${tint} ${radius} ${className}`}>
       <Image
         src={image.url}
         alt={name}

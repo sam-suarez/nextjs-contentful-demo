@@ -5,7 +5,15 @@ import { MembersOnlyBadge } from "@/components/badge";
 import { CATEGORY_META } from "@/components/categories";
 import { Price } from "@/components/price";
 import { ProductImageFrame } from "@/components/product-image-frame";
-import { COLOR_CLASSES } from "@/components/ui-classes";
+import {
+  CARD_META_TEXT,
+  COLOR_CLASSES,
+  PRODUCT_CARD_BODY,
+  PRODUCT_CARD_FRAME,
+  PRODUCT_CARD_ICON,
+  PRODUCT_CARD_IMAGE_BOX,
+  PRODUCT_NAME_TEXT,
+} from "@/components/ui-classes";
 import type { CatalogProduct } from "@/lib/products/types";
 
 /**
@@ -23,9 +31,9 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
   return (
     <article
       style={{ "--i": index } as CSSProperties}
-      className={`pop-in sticker-card ${membersOnly ? "sticker-member" : "sticker"} relative flex flex-col rounded-xl border-2 border-foreground bg-card group-data-[layout=specs]:sm:flex-row`}
+      className={`pop-in sticker-card ${membersOnly ? "sticker-member" : "sticker"} ${PRODUCT_CARD_FRAME} group-data-[layout=specs]:sm:flex-row`}
     >
-      <div className="p-3 group-data-[layout=specs]:sm:w-40 group-data-[layout=specs]:sm:shrink-0 group-data-[layout=specs]:sm:pr-0">
+      <div className={`${PRODUCT_CARD_IMAGE_BOX} group-data-[layout=specs]:sm:w-40 group-data-[layout=specs]:sm:shrink-0 group-data-[layout=specs]:sm:pr-0`}>
         <ProductImageFrame
           image={product.image}
           name={product.name}
@@ -34,9 +42,9 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
         />
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 px-4 pb-4 group-data-[layout=specs]:pt-3">
+      <div className={`${PRODUCT_CARD_BODY} group-data-[layout=specs]:pt-3`}>
         <span
-          className={`wiggle -mt-5 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-foreground text-foreground ${colors.fill} order-1 group-data-[layout=specs]:hidden`}
+          className={`wiggle ${PRODUCT_CARD_ICON} inline-flex items-center justify-center rounded-full border-2 border-foreground text-foreground ${colors.fill} order-1 group-data-[layout=specs]:hidden`}
         >
           <Icon aria-hidden="true" strokeWidth={2.5} className="h-5 w-5" />
         </span>
@@ -48,7 +56,7 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
         />
 
         <div className="order-3 flex flex-wrap items-center gap-2 group-data-[layout=specs]:order-1">
-          <h2 className="font-heading text-lg leading-snug font-bold">
+          <h2 className={PRODUCT_NAME_TEXT}>
             <Link
               href={"/products/" + product.slug}
               className="rounded-sm after:absolute after:inset-0 after:rounded-xl"
@@ -59,7 +67,7 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
           {membersOnly && <MembersOnlyBadge />}
         </div>
 
-        <p className="order-4 flex items-center gap-2 text-sm font-medium text-muted-foreground group-data-[layout=specs]:order-2">
+        <p className={`${CARD_META_TEXT} order-4 flex items-center gap-2 font-medium text-muted-foreground group-data-[layout=specs]:order-2`}>
           <span
             className={`wiggle hidden h-7 w-7 items-center justify-center rounded-full border-2 border-foreground text-foreground group-data-[layout=specs]:inline-flex ${colors.fill}`}
           >
@@ -68,7 +76,7 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
           {meta.label}
         </p>
 
-        <p className="order-5 text-sm text-muted-foreground group-data-[layout=specs]:hidden">
+        <p className={`${CARD_META_TEXT} order-5 text-muted-foreground group-data-[layout=specs]:hidden`}>
           {`${product.ageRange} · ${product.material}`}
         </p>
 

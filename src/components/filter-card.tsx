@@ -6,31 +6,45 @@ import { catalogHref, type CatalogParams } from "@/components/catalog-params";
 import { CATEGORY_META } from "@/components/categories";
 import { LayoutToggle } from "@/components/client/layout-toggle";
 import { formatToyCount } from "@/components/format";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY, CARD_BASE, COLOR_CLASSES, LABEL } from "@/components/ui-classes";
+import {
+  BUTTON_PRIMARY,
+  BUTTON_SECONDARY,
+  CATEGORY_CHIP,
+  CHIP_ROW,
+  COLOR_CLASSES,
+  COUNT_TEXT,
+  FILTER_CARD_FRAME,
+  FILTER_FOOTER_ROW,
+  FILTER_LAYOUT_COLUMN,
+  FILTER_SEARCH_COLUMN,
+  FILTER_SEARCH_ROW,
+  FILTER_TOP_ROW,
+  INPUT,
+  LABEL,
+  LAYOUT_TRACK,
+  SEARCH_INPUT_SIZE,
+} from "@/components/ui-classes";
 import { CATEGORIES, type Category } from "@/schemas/product";
-
-const CHIP =
-  "inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-foreground px-4 text-sm font-bold";
 
 /** Search (GET form), category chips, layout toggle (island; real links without JS), count and Clear filters. Works without JS. */
 export function FilterCard({ params, count }: { params: CatalogParams; count: number }) {
   const { category, q, layout } = params;
 
   return (
-    <section aria-label="Filters" className={`${CARD_BASE} sticker flex flex-col gap-5 p-4 md:p-6`}>
-      <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-        <Form action="/" className="flex flex-1 flex-col gap-2 md:max-w-xl">
+    <section aria-label="Filters" className={FILTER_CARD_FRAME}>
+      <div className={FILTER_TOP_ROW}>
+        <Form action="/" className={FILTER_SEARCH_COLUMN}>
           <label htmlFor="catalog-search" className={LABEL}>
             Search
           </label>
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className={FILTER_SEARCH_ROW}>
             <input
               id="catalog-search"
               type="search"
               name="q"
               defaultValue={q}
               placeholder="Search toys by name or feature"
-              className="min-h-12 flex-1 rounded-lg border-2 border-input-border bg-input px-4 placeholder:text-muted-foreground focus:border-accent focus:shadow-pop-accent"
+              className={`${INPUT} ${SEARCH_INPUT_SIZE}`}
             />
             {category && <input type="hidden" name="category" value={category} />}
             {layout === "specs" && <input type="hidden" name="layout" value="specs" />}
@@ -41,14 +55,14 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
           </div>
         </Form>
 
-        <div className="flex flex-col gap-2">
+        <div className={FILTER_LAYOUT_COLUMN}>
           <p id="layout-label" className={LABEL}>
             Layout
           </p>
           <div
             role="group"
             aria-labelledby="layout-label"
-            className="inline-flex w-fit gap-1 rounded-full border-2 border-foreground bg-muted p-1"
+            className={`${LAYOUT_TRACK} border-foreground bg-muted`}
           >
             <LayoutToggle
               hrefs={{
@@ -61,7 +75,7 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
       </div>
 
       <nav aria-label="Categories">
-        <ul className="flex flex-wrap gap-2">
+        <ul className={CHIP_ROW}>
           <li>
             <CategoryChip label="All" href={catalogHref({ category: null, q, layout })} active={category === null} />
           </li>
@@ -78,8 +92,8 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
         </ul>
       </nav>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-border pt-4">
-        <p className="font-heading text-lg font-bold">{formatToyCount(count)}</p>
+      <div className={FILTER_FOOTER_ROW}>
+        <p className={COUNT_TEXT}>{formatToyCount(count)}</p>
         <Link href="/" className={BUTTON_SECONDARY}>
           Clear filters
         </Link>
@@ -105,7 +119,7 @@ function CategoryChip({
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
-      className={`${CHIP} ${active ? activeClasses : "bg-card text-foreground hover:bg-muted"}`}
+      className={`${CATEGORY_CHIP} ${active ? activeClasses : "bg-card text-foreground hover:bg-muted"}`}
     >
       {colors && (
         <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-full border-2 border-foreground ${colors.fill}`} />

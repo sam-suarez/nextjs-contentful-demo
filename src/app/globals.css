@@ -43,6 +43,7 @@
 
   --animate-pop-in: pop-in 400ms var(--ease-bounce);
   --animate-wiggle: wiggle 400ms var(--ease-bounce);
+  --animate-skeleton-pulse: skeleton-pulse 1.6s ease-in-out infinite;
 
   @keyframes pop-in {
     from {
@@ -52,6 +53,17 @@
     to {
       opacity: 1;
       transform: scale(1);
+    }
+  }
+
+  /* Skeleton pulse (docs/design.md Skeleton): opacity only, so it never moves layout. */
+  @keyframes skeleton-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
     }
   }
 
@@ -136,6 +148,18 @@
   }
   .sticker-card.sticker-member:hover {
     box-shadow: var(--shadow-sticker-member-hover);
+  }
+
+  /* Suspense skeleton blocks (src/components/skeletons.tsx). */
+  .skeleton-pulse {
+    animation: var(--animate-skeleton-pulse);
+  }
+}
+
+/* No skeleton pulse when the visitor asks for less motion (docs/design.md Motion, Skeleton). */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-pulse {
+    animation: none;
   }
 }
 

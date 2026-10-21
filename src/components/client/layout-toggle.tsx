@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createContext, use, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 
 import { parseCatalogParams, type CatalogLayout } from "@/components/catalog-params";
+import { LAYOUT_OPTION } from "@/components/ui-classes";
 
 // UI state only (D-019): the current layout. Cards, prices and Set B arrive as server `children`.
 const LayoutContext = createContext<CatalogLayout | null>(null);
@@ -87,7 +88,7 @@ export function LayoutToggle({ hrefs }: { hrefs: Record<CatalogLayout, string> }
             prefetch={false}
             onClick={(event) => onClick(event, option.value)}
             {...state}
-            className={`inline-flex min-h-12 items-center rounded-full border-2 px-4 text-sm font-bold ${
+            className={`${LAYOUT_OPTION} ${
               active ? "border-foreground bg-card shadow-pop" : "border-transparent text-muted-foreground"
             }`}
           >

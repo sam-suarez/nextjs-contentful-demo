@@ -34,3 +34,6 @@ Versions: next 16.4.2, react 19.3, `cacheComponents: true`, `partialPrefetching:
 - A held animation `transform` (`animation-fill-mode: both`) overrides a hover `transform`; use the separate `rotate` / `scale` properties.
 - Turbopack can serve stale CSS after another agent's build. If styles look wrong, `rm -rf .next` and rebuild.
 - Never `pkill -f next-server`: it also kills the human's `next dev`. Stop only the PID your script started.
+- With `instant = false` gone and request reads inside `<Suspense>`, `/`, `/login` and `/products/[slug]` all build `◐` (Partial Prerender). That is the expected D-031 state, not a regression.
+- `notFound()` called inside a `<Suspense>` boundary can't change the already-sent status: an unknown slug answers 200 with `noindex` and renders `not-found.tsx` from the stream. Only `src/proxy.ts` can give a real status code.
+- A client island calling `useSearchParams()` must sit inside a `<Suspense>` once the route is no longer fully dynamic, or the build fails.

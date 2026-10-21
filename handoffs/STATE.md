@@ -1,99 +1,44 @@
 # Pipeline state
 
-Owned by the orchestrator (`agents/orchestrator.md`). No other agent edits this file, and the reviewer never reads it (D-024). Seeded manually in Part 4. Phase plan from D-026.
+Owned by the orchestrator (`agents/orchestrator.md`). No other agent opens this file (D-024). Kept short on purpose (D-033): phase scope and contracts as built are in `handoffs/CONTRACTS.md`, the round history is appended to `handoffs/LOG.md`.
 
 ## Current
 
 | Field | Value |
 |---|---|
-| Phase | 07 suspense skeletons |
+| Phase | 08 release check |
 | Status | spec <!-- not started / spec / build / review / done / escalated --> |
-| Build round | 0 |
-| Base commit | 8a147c9 |
-| Open escalation | none blocking (OI-2 non-blocking). Resume thread (D-026 suspended by the human for this thread): Step A docs → 04-fix1 → 07 → 08 |
+| Build round | 0 (qa only) |
+| Base commit | 5f15cd8 |
+| Next step | 1 (spec) for phase 08, same thread (D-026 suspended by the human) |
+| Open escalation | none blocking (OI-2 non-blocking). Batch-run thread 2: 07 closed; still to do: 08 release check → `handoffs/VERIFY.md` |
 
 ## Phase plan
 
 Run in order, one phase per thread, each ending at the human gate (D-026). Exception: the batch-run thread (04 round 3 → 05 → 06) suspended D-026 at the human's instruction.
 
-| Phase | Builder | Builds | qa writes first (D-025) | Status | Commit |
-|---|---|---|---|---|---|
-| 01 auth core | data-auth | `src/lib/session.ts` (sign/verify, set/delete cookie), `src/lib/auth/actions.ts` (login/logout, zod, safe `next`), `src/proxy.ts` (optimistic redirects), `SESSION_SECRET` in `.env.example` | Unit: token round-trip, tampered and expired tokens rejected, missing/short secret throws, empty name rejected, `next` validation (`//evil.com` and `https://…` rejected, `/products/x` accepted) | done (2 rounds used) | `feat(auth): phase 01 - auth core` |
-| 02 data layer | data-auth | Mock and live adapters, source selection + one log line, `fetchProducts` (`'use cache'`), `src/lib/dal.ts` (`verifySession`, `getProducts`, `getProductBySlug`), pure `filterProducts` | Unit: logged out never returns `authenticated`, logged in returns both sets, slug results (product / requires login / not found), category, `q` and combined filters, `https:` prefix on live image URLs, empty `CONTENTFUL_*` selects mock | done (1 round used) | `feat(data): phase 02 - data layer` |
-| 03 catalog | ui | Design tokens + fonts + root layout/footer, site header (both variants, sign-out form), banner, `/` with `instant = false`, both card variants (Set B mixed in with "Members only" badge), price, image placeholder, filter card (search form, category links, layout links, count, Clear filters), empty state, `next.config.ts` images, `lucide-react` (`docs/design.md`) | `scripts/verify-ssr.sh`: both directions with a self-minted cookie, no `<div hidden id="S:`, no `<!--$?-->`, no fallback text, a filtered URL renders filtered HTML | done (2 rounds used) | `feat(catalog): phase 03 - catalog` |
-| 04 detail + login | ui | `/products/[slug]` (307 to `/login?next=`, `notFound()` + `not-found.tsx`), `/login` page with `?error=missing` alert (`docs/design.md`) | Extend verify-ssr.sh (unknown slug 404, Set B slug 307 with `next`, logged-in detail price); add `playwright.config.ts` + browser install; e2e: login → Set B visible → logout | escalated (3 rounds used; OI-1, R17) | `wip(detail): phase 04 - detail + login (escalated: …)` |
-| 05 layout toggle | ui | Client island in `src/components/client/` replacing the P03 layout links (still real links without JS), `data-layout` on the grid, `group-data` switching, `history.replaceState` URL sync | e2e: toggle reorders cards with no navigation/reload; JS disabled: `?layout=specs` renders specs-first | done (1 round used) | `feat(layout): phase 05 - layout toggle` |
-| 06 release check | qa only | Runs every check against `next build && next start`, incl. the JS-disabled Playwright project | (none: no builder). Each failure becomes `phase-NN-fixK` for the owner of the failing path | done (all PASS except R17/OI-1; no fix phases) | `test(release): phase 06 - release check` |
-| 04-fix1 proxy redirect (OI-1) | data-auth | `src/lib/products/members-only.ts` (`isMembersOnlySlug`, in-memory TTL cache), `src/proxy.ts` 307 for logged-out Set B slugs, matcher adds `/products/:slug` (D-032) | Unit: helper (Set B true, others false, one fetch per TTL, log line), proxy (307 + Location, pass-through cases, fail open, matcher); verify-ssr: R3 307 + Location restored, one cache-fill log line over 3 requests; e2e: R17 URL check anchored to the pathname | spec | |
-| 07 suspense skeletons | ui | Remove every `instant = false`; `<Suspense>` + layout-matched skeletons around the request-dependent parts of `/`, `/products/[slug]`, `/login` and the header (D-031) | Remove D-031-dropped checks (verify-ssr streaming/fallback asserts, `chromium-no-js` project + `*.nojs.spec.ts`); keep both-directions response-body checks; add CLS e2e (< 0.01) on `/`, a filtered URL and a product page | not started | |
-| 08 release check | qa only | Every check against `next build && next start` (like 06) | (none: no builder). Each failure becomes `phase-08-fixK` for the owner of the failing path | not started | |
-
-### Phase notes for spec writing
-
-- P01: the cookie name (`session`), payload (display name + expiry) and flags are fixed by architecture.md Auth. Pick and record the export names in the spec contract; P02 and P03 depend on them. The login action reads form fields `username`, `password` and `next`; both trimmed values must be non-empty, the password is discarded, and empty input redirects to `/login?error=missing` (keeping `next`). Logout redirects to `/`.
-- P01 contract as built (P02/P03/P04 call these): `src/lib/session.ts` exports `SESSION_COOKIE` (`"session"`), `SESSION_TTL_SECONDS`, `type Session = { name: string; expiresAt: Date }`, `signSession(name)`, `verifySessionToken(token)`, `createSession(name)`, `deleteSession()`. `src/lib/auth/next-path.ts` exports `safeNextPath(value): string | null`. `src/lib/auth/actions.ts` exports `login(formData)` and `logout()` with function-level `"use server"` (callers must be server components). `src/proxy.ts` matches `/login` only. `verifySessionToken` throws when `SESSION_SECRET` is missing or short, even for a missing token, so every check that starts a server must set its own secret.
-- P02 contract as built (P03/P04 call these; full shapes in `handoffs/phase-02/spec.md` Contract): `src/lib/dal.ts` exports `verifySession(): Promise<Session | null>`, `getProducts(): Promise<CatalogProduct[]>` (name order, Set B mixed in when logged in), `getProductBySlug(slug): Promise<ProductBySlugResult>` with `{ status: "found"; product } | { status: "requires-login" } | { status: "not-found" }`. `src/lib/products/types.ts` exports `CatalogProduct` (`id, slug, name, category, visibility, description, ageRange, material, features: string[], image: { url, alt, width, height } | null, price: number, priceTier: "everyday" | "member"`), `ProductImage`, `PriceTier`. `src/lib/products/filter.ts` exports `filterProducts(products, { category?, q? })` taking raw search-param strings (unknown category and blank `q` ignored). Pages render `price` and pick the label from `priceTier`; they never choose a price. All three DAL functions throw without `SESSION_SECRET`.
-- P03: `fetchProducts`'s `"use cache"` (function-level, in a file whose first line is `import "server-only";`) is first compiled by P03's build, because no route imported `dal.ts` before. If the build rejects it, escalate. The `[products] source: …` log line fires on the first cache miss per server instance, not at startup. `ProductImage.alt` is `description ?? title`, so an empty-string description gives `alt: ""`; the card may treat that as decorative or the human may want a P02 follow-up.
-- P02: `verifySession()` reads `(await cookies()).get(SESSION_COOKIE)?.value` and calls `verifySessionToken`, wrapped in React `cache`. Do not re-implement JWT verification.
-- P03: the sign-out form is the first place Next compiles `actions.ts`'s function-level `"use server"` through its server-action transform. If the build rejects it, escalate (don't move to a file-level directive without a decision, because of the `server-only` first-line rule).
-- P02: `getProductBySlug` must return a discriminated result (product / requires login / not found) so P04 can redirect or call `notFound()` without re-checking the session. The DAL also resolves which price applies (e.g. `price` + `priceTier: "everyday" | "member"` per product), so pages never pick a price from the session and a logged-out render never holds a member price. `q` matches name, description and features, case-insensitive, trimmed.
-- P03: copy every string the checks rely on from `docs/design.md` into the spec contract: price format (`$11.20`), price labels ("Everyday price" / "Member price"), the "Members only" badge, banner sentences, count text, empty-state text. Set B is mixed into the one grid with the badge (no separate section). The spec lists `lucide-react` as the allowed `package.json` change and the font swap (Outfit + Plus Jakarta Sans). The logged-in direction uses a cookie minted by the script, not the login UI.
-- P03 contract as built (P04/P05 call these; full shapes in `handoffs/phase-03/spec.md` Contract): `src/components/site-header.tsx` `SiteHeader({ variant: "session" | "minimal" })` (minimal = logo + "Back to catalog", no session read); `site-footer.tsx` `SiteFooter` (rendered by the root layout); `price.tsx` `Price({ amount, tier, className? })`; `product-image-frame.tsx` `ProductImageFrame({ image, name, category, shape?: "square" | "blob", className? })`; `badge.tsx` `MembersOnlyBadge`, `MemberPricingBadge`; `format.ts` (`formatPrice`, `formatToyCount`, `memberBannerText`, `emptyStateMessage`, `LOGGED_OUT_BANNER_TEXT`); `catalog-params.ts` (`LAYOUTS`, `CatalogLayout`, `parseCatalogParams`, `catalogHref`; isomorphic, so the P05 island may import it); `categories.ts` (`CATEGORY_META`, `categoryLabel`); shared class strings in `ui-classes.ts` (`BUTTON_PRIMARY`, `BUTTON_SECONDARY`, `TEXT_LINK`, `LABEL`, `CARD_BASE`, …). Pages render `<SiteHeader>` then their own `<main>`; the root layout renders `{children}` + `<SiteFooter />` only.
-- P03 → P04: `scripts/verify-ssr.sh` runs its own build (skip with `VERIFY_SSR_SKIP_BUILD=1`), port `VERIFY_SSR_PORT` (default 3210), mints `session` for `ssr-checker`; extend it rather than fork it. `next build` type-checks `*.test.ts`, so a pre-build test importing a missing module fails the build (qa must expect that). React escapes `'` → `&#x27;` and `&` → `&amp;`; strings checked by grep must be one text node. The `minimal` header's "Back to catalog" `TEXT_LINK` has no `min-h-12`. Global `:focus-visible` lives outside every `@layer` in `globals.css` on purpose.
-- P03 open for the human: the title-area decoration may overlap the title text just above `md` (~768px), and npm flipped `@types/react` / `csstype` to `devOptional` in the lockfile when adding lucide-react.
-- P04: `next` must survive the round trip `/products/<slug>` → `/login?next=…` → back to the product, including through the `?error=missing` redirect. `/login` exports `instant = false`. `not-found.tsx` gets no props, so its copy does not echo the slug.
-- P05: the island receives the current layout only and renders real links (no-JS fallback). Cards stay server components.
-- P05 contract as built: `src/components/client/layout-toggle.tsx` exports `LayoutProvider({ layout, children })`, `LayoutGrid({ children })`, `LayoutToggle({ hrefs })`; layout read from `useSearchParams()` (needs `/` to stay dynamic). Playwright projects `chromium` and `chromium-no-js` (`*.nojs.spec.ts`).
-- P06: release check runs every check against `next build && next start`. `e2e/login.spec.ts` R17 fails until OI-1 is decided; record it under OI-1, not as a fix phase (its owner depends on the decision).
-
-## Round and escalation log
-
-| Phase | Round | Event | Outcome |
+| Phase | Builder | Status | Commit |
 |---|---|---|---|
-| 01 | 0 | qa pre-build: 103 tests in 4 files, all fail on missing modules | tests locked (`handoffs/phase-01/tests.sha`) |
-| 01 | 1 | data-auth build: all 5 checks pass, no disputes; test lock intact | qa post-build PASS (109 tests) |
-| 01 | 1 | reviewer: REVISE on R18 + G5 only (3 test files under `src/lib/**` lack `import "server-only";`); all else PASS | escalated: fix is in qa paths |
-| 01 | 2 | human decision: qa adds the import to the 3 tests; R18 amended to cover colocated tests | qa dispute mode, then re-lock, post-build, review round 2 |
-| 01 | 2 | qa dispute: added `import "server-only";` line 1 to 3 tests (no other change); re-locked; builder dispatch skipped (nothing in its paths); qa post-build PASS (109 tests); reviewer PASS on R1–R19, G1–G6 | closed, committed |
-| 02 | 0 | qa pre-build: first dispatch cut off by an API error (machine slept) after 5 test files; re-dispatched with the same inputs. 142 tests in 6 files, all fail on missing modules only | tests locked (`handoffs/phase-02/tests.sha`) |
-| 02 | 1 | data-auth build: 7 files, all 5 checks pass, no disputes; test lock intact | qa post-build PASS (251 tests: 109 P01 + 142 P02) |
-| 02 | 1 | reviewer: PASS on R1–R19, G1–G6 | closed, committed |
-| 03 | 0 | qa pre-build: 3 unit test files (54 tests) + `scripts/verify-ssr.sh` (~262 assertions over 13 page fetches); unit tests fail on missing modules / `lucide-react`; verify-ssr fails at build (test files are type-checked by `next build`) and, against the starter page, 134 FAIL / 128 PASS (absence checks) | tests locked (`handoffs/phase-03/tests.sha`, 15 files) |
-| 03 | 1 | ui build: 6 files edited + 16 created under `src/components/`, all checks pass (verify-ssr 262/262), no disputes; test lock intact | qa post-build PASS (305 unit tests, verify-ssr 262/262, R14 build OK) |
-| 03 | 1 | reviewer: REVISE on R31 only (`:focus-visible` in `@layer base` loses to `.btn-pop` / `shadow-*` utilities; search input `focus:outline-none`); all else PASS | back to ui, round 2, fix input `review.md` |
-| 03 | 2 | ui build: `:focus-visible` moved outside all `@layer`s, `focus:outline-none` removed from the search input; all checks pass; test lock intact | qa post-build PASS (305 unit, verify-ssr 262/262, R14 build OK) |
-| 03 | 2 | reviewer: PASS on R1–R33, G1–G6 | closed, committed |
-| 04 | 0 | qa pre-build: extended `scripts/verify-ssr.sh` (R2–R16) + new `playwright.config.ts`/`e2e/login.spec.ts` (R17); 337 passed, 70 expected-failures, all for the right reason | tests locked (`handoffs/phase-04/tests.sha`, 17 files) |
-| 04 | 1 | ui build: 4 files created (`src/app/products/[slug]/page.tsx` + `not-found.tsx`, `src/app/login/page.tsx`, `src/components/alert.tsx`); typecheck/lint/unit/client-boundary/build all pass; test lock intact. `npm run build` marks `/products/[slug]` as `◐` Partial Prerender (unlike `/` and `/login`, `ƒ`) despite identical `instant = false`; ui diagnosed this as inherent to the dynamic segment (reproduces on a no-op page) and escalated rather than guess further | escalated before qa post-build formally confirmed it |
-| 04 | 1 | qa post-build: confirmed the same root cause independently (`requires-login`/`not-found` branches return 200 with an empty shell instead of 307/404; real UI only in the hydration flight payload). `scripts/verify-ssr.sh` 395 passed / 12 failed; `npm run test:e2e` 1 failed (R17, same symptom client-side). Also flagged R4/R5's exact-count price-string assertions as its own test-authoring bug, unrelated to the escalation | FAIL — escalating instead of a round-2 fix attempt, since the diagnosed cause sits outside ui's owned paths and architecture.md's own prescription |
-| 04 | 2 | human decision (2026-10-20): R4/R5 exact-once bare-price counts dropped; ui may add `await connection()` (spec Amendments). Thread started via `/phase` | qa dispute mode |
-| 04 | 2 | qa dispute: R4/R5 `$28.00`/`$22.40` exact-once → presence (`has`), 2 lines in `scripts/verify-ssr.sh`; R2/R3/R16/R17 kept; re-locked (17 files) | ui round 2, fix input spec Amendments + qa.md |
-| 04 | 2 | ui build: added `await connection()` first in `src/app/products/[slug]/page.tsx` (only change). typecheck/lint/unit (305)/client-boundary/build pass, but the route still builds `◐`; verify-ssr 397 passed / 10 failed (all R2/R3/R16); e2e R17 fails; test lock intact | escalated: amendment trigger fired, proxy-based design needs human approval |
-| 04 | 3 | human decision: accept JS-handled 307/404 on `/products/[slug]` (spec Amendments round 3) | qa dispute |
-| 04 | 3 | qa dispute: added `e2e/not-found.spec.ts` (2 tests, pass); kept the R3 leak guards and R17; removing 12 R2/R3/R16 server checks in `verify-ssr.sh` blocked by the permission classifier ("Security Test Removal"), not retried | stopped for the human edit; not re-locked |
-| 04 | 3 | at the human's explicit instruction, the orchestrator deleted the 12 checks itself (an exception to its Paths table); `bash -n` OK; R3 leak guards kept | re-lock + ui round 3 next thread |
-| 04 | 3 | batch-run thread: human check "EDIT DONE"; re-locked (18 files, adds `e2e/not-found.spec.ts`) | ui round 3, fix input qa.md |
-| 04 | 3 | ui build: no source change; R17 cause traced to the preserved `<Activity>` entry replaying the client `redirect()`; no fix inside ui paths/spec; test lock intact | escalated by ui |
-| 04 | 3 | qa post-build: FAIL on R17 only (typecheck/lint/unit 305/boundary/build OK, verify-ssr 380/380, e2e 2/3) | escalated (3 rounds used): OI-1; no review; committed as wip |
-| 05 | 0 | qa pre-build: `playwright.config.ts` (2 projects), `e2e/layout-toggle.spec.ts` (10), `e2e/layout-toggle.nojs.spec.ts` (4), verify-ssr R3/R5/R6 (551 total); 9 JS tests fail on missing `aria-pressed` (no island), guards of unchanged markup pass | tests locked (20 files) |
-| 05 | 1 | ui build: `src/components/client/layout-toggle.tsx` (new) + filter-card, product-grid, page; all checks pass, e2e 16/17 (only R17, OI-1); test lock intact | qa post-build PASS |
-| 05 | 1 | reviewer: PASS on R1–R15, G1–G6 | closed, committed |
-| 06 | 1 | qa release run (post-build mode, no builder): clean build OK, typecheck/lint/unit 305/boundary OK, verify-ssr 551/551, e2e 16/17 (only R17, OI-1), source scan/.env.example/git status OK; test lock intact; diff empty, no review | closed, committed; no fix phases |
-| 04-fix1 | 0 | qa pre-build: new `src/lib/products/members-only.test.ts` (51, all fail: missing module), rewritten `src/proxy.test.ts` (21 fail / 25 pass), verify-ssr R4/R10/R11 (16 fail / 594 pass), `e2e/login.spec.ts` R12 anchored to the pathname (fails: OI-1). `npm test` 72 failed / 318 passed. Build red until the helper exists (test type-checked by `next build`) | tests locked (`handoffs/phase-04-fix1/tests.sha`, 21 files) |
-| 04-fix1 | 1 | data-auth build: `src/lib/products/members-only.ts` (new) + `src/proxy.ts`; typecheck/lint/unit 390/boundary/build/verify-ssr 610 pass; R11 holds under `next start` (1 cache-fill line for 7 requests); e2e 16/17, disputed `e2e/login.spec.ts` lines 44-45 (whole-DOM counts hit the hidden `<Activity>` copy of the previous page after sign-out); test lock intact | qa dispute |
-| 04-fix1 | 1 | qa dispute: test was wrong; post-sign-out checks made visibility-aware, plus no `session` cookie and whole-DOM counts after `page.reload()`; re-locked (21 files). Builder not re-dispatched (nothing in its paths, P01 precedent) | qa post-build |
-| 04-fix1 | 1 | qa post-build PASS: typecheck, lint, unit 390/390, boundary, build, verify-ssr 610/610, e2e 17/17 (R12 5/5 with `--repeat-each=5`); lock intact | review |
-| 04-fix1 | 1 | reviewer: PASS on R1–R14, G1–G6 (notes: hidden Set B DOM after sign-out → OI-2) | closed, committed; OI-1 closed |
+| 01 auth core | data-auth | done (2 rounds used) | `feat(auth): phase 01 - auth core` |
+| 02 data layer | data-auth | done (1 round used) | `feat(data): phase 02 - data layer` |
+| 03 catalog | ui | done (2 rounds used) | `feat(catalog): phase 03 - catalog` |
+| 04 detail + login | ui | escalated (3 rounds used; OI-1, R17) | `wip(detail): phase 04 - detail + login (escalated: …)` |
+| 05 layout toggle | ui | done (1 round used) | `feat(layout): phase 05 - layout toggle` |
+| 06 release check | qa only | done (all PASS except R17/OI-1; no fix phases) | `test(release): phase 06 - release check` |
+| 04-fix1 proxy redirect (OI-1) | data-auth | done (1 round used; 1 dispute) | `feat(auth): phase 04-fix1 - proxy redirect for members-only slugs` (5f15cd8) |
+| 07 suspense skeletons | ui | done (2 rounds used) | `feat(ui): phase 07 - suspense skeletons` |
+| 08 release check | qa only | spec |  |
 
 ## Human checks
 
 | Phase | Result | Notes |
 |---|---|---|
-| Part 4 (agent system, 589dd98) | PASSED | Recorded at the start of the phase 01 thread. The thread started from a pasted prompt rather than `/phase`, so the orchestrator path-guard hook was not registered; the orchestrator kept to its Paths table by hand (see `docs/intervention-log.md`) |
-| 01 auth core (bb5be94) | PASSED | Recorded at the start of the phase 02 thread. Again started from a pasted prompt (placeholder `Human check:` line; the human answered PASSED when asked), so the orchestrator path-guard hook is not registered this thread either |
-| 02 data layer (04e62d2) | PASSED | Recorded at the start of the phase 03 thread. Started from a pasted prompt again (Human check line filled in this time), so the orchestrator path-guard hook is not registered; Paths kept by hand |
-| 03 catalog (06d1f58) | PASSED | Recorded at the start of the phase 04 thread via `/phase PASSED` |
+| Part 4 (agent system, 589dd98) | PASSED | Pasted prompt, path guard off (intervention log) |
+| 01 auth core (bb5be94) | PASSED | Pasted prompt, path guard off |
+| 02 data layer (04e62d2) | PASSED | Pasted prompt, path guard off |
+| 03 catalog (06d1f58) | PASSED | via `/phase PASSED` |
 | 04 detail + login (wip, escalated) | DEFERRED (batch run) | OI-1 open; see `handoffs/phase-04/human-check.md` |
 | 05 layout toggle (f7dff1f) | DEFERRED (batch run) | see `handoffs/phase-05/human-check.md` |
 | 06 release check | DEFERRED (batch run) | see `handoffs/phase-06/human-check.md` |
 | 04-fix1 proxy redirect | DEFERRED (batch run) | see `handoffs/phase-04-fix1/human-check.md`; OI-2 open (non-blocking) |
+| 07 suspense skeletons | DEFERRED (batch run) | see `handoffs/phase-07/human-check.md`; 5 visible layout changes need sign-off |

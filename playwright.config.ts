@@ -2,9 +2,9 @@
 // app with mock data forced, the same env pattern as scripts/verify-ssr.sh (D-021,
 // architecture.md Tests): CONTENTFUL_* blanked, own SESSION_SECRET.
 //
-// P05 R13 (D-009): two projects, scoped by file name.
-//   chromium        JS enabled, runs every spec except `*.nojs.spec.ts`
-//   chromium-no-js  javaScriptEnabled: false, runs only `*.nojs.spec.ts`
+// One project, JavaScript enabled (P05 R13). P07 R12 (D-031): the `chromium-no-js` project and
+// `e2e/layout-toggle.nojs.spec.ts` are removed; without JavaScript, streamed content shows only
+// its skeleton, and that is accepted.
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = process.env.PLAYWRIGHT_PORT ?? "3220";
@@ -22,13 +22,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /\.nojs\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"] },
-    },
-    {
-      name: "chromium-no-js",
-      testMatch: /\.nojs\.spec\.ts$/,
-      use: { ...devices["Desktop Chrome"], javaScriptEnabled: false },
     },
   ],
   webServer: {

@@ -1,0 +1,1677 @@
+diff --git a/e2e/layout-shift.spec.ts b/e2e/layout-shift.spec.ts
+new file mode 100644
+index 0000000..6638cc4
+--- /dev/null
++++ b/e2e/layout-shift.spec.ts
+@@ -0,0 +1,149 @@
++// P07 R10 (D-031): Cumulative Layout Shift while the Suspense skeletons are replaced.
++// Also covers the e2e part of R4 (header session skeleton), R5 (banner + catalog), R6 (detail)
++// and R8 (skeleton outer size equals the content's, at 1280x720 and at 375 px width).
++// Written from handoffs/phase-07/spec.md (Requirements + Contract), mock data only.
++//
++// Before navigation, an init script installs:
++//   - a PerformanceObserver for `layout-shift` (buffered: true) that sums `value` of every entry
++//     without `hadRecentInput`;
++//   - a MutationObserver that records every element with a `data-skeleton` attribute the page
++//     ever puts in the DOM (with its `aria-busy`), so the test knows the skeletons really were
++//     part of the load it measured (Contract: root data-skeleton values, aria-busy="true").
++// JavaScript enabled (single "chromium" project). Logged-in state uses a `session` cookie minted
++// with jose and the Playwright webServer SESSION_SECRET (Contract allows this).
++import { expect, test, type BrowserContext, type Page } from "@playwright/test";
++import { SignJWT } from "jose";
++import config from "../playwright.config";
++
++const CLS_LIMIT = 0.01;
++
++const VIEWPORTS = [
++  { label: "1280x720", size: { width: 1280, height: 720 } },
++  { label: "375 px", size: { width: 375, height: 812 } },
++] as const;
++
++type Route = {
++  path: string;
++  /** Visible h1 text after load (page h1 or product name). */
++  h1: string;
++  /** Skeleton roots (Contract `data-skeleton` values) the load must have shown and replaced. */
++  skeletons: string[];
++};
++
++const ROUTES: Route[] = [
++  { path: "/", h1: "Toy catalog", skeletons: ["header-session", "banner", "catalog"] },
++  { path: "/?category=bath", h1: "Toy catalog", skeletons: ["header-session", "banner", "catalog"] },
++  { path: "/products/cloud-bunny-plush", h1: "Cloud Bunny Plush", skeletons: ["header-session", "product-detail"] },
++];
++
++const STATES = [
++  { label: "logged out", loggedIn: false, priceLabel: "Everyday price" },
++  { label: "logged in", loggedIn: true, priceLabel: "Member price" },
++] as const;
++
++function sessionSecret(): string {
++  const ws = config.webServer;
++  const server = Array.isArray(ws) ? ws[0] : ws;
++  const secret = server?.env?.SESSION_SECRET;
++  if (!secret) throw new Error("playwright.config.ts webServer.env.SESSION_SECRET is not set");
++  return secret;
++}
++
++async function addSessionCookie(context: BrowserContext, baseURL: string) {
++  const token = await new SignJWT({ name: "playwright-cls" })
++    .setProtectedHeader({ alg: "HS256" })
++    .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
++    .sign(new TextEncoder().encode(sessionSecret()));
++  await context.addCookies([
++    { name: "session", value: token, url: baseURL, httpOnly: true, sameSite: "Lax", secure: false },
++  ]);
++}
++
++type Probe = { cls: number; shifts: number; skeletons: Record<string, string | null> };
++
++async function installProbe(page: Page) {
++  await page.addInitScript(() => {
++    const w = window as unknown as { __qaProbe: Probe };
++    w.__qaProbe = { cls: 0, shifts: 0, skeletons: {} };
++    type Shift = PerformanceEntry & { value: number; hadRecentInput: boolean };
++    new PerformanceObserver((list) => {
++      for (const entry of list.getEntries() as Shift[]) {
++        if (entry.hadRecentInput) continue;
++        w.__qaProbe.cls += entry.value;
++        w.__qaProbe.shifts += 1;
++      }
++    }).observe({ type: "layout-shift", buffered: true });
++
++    const record = (el: Element) => {
++      const name = el.getAttribute("data-skeleton");
++      if (name !== null && !(name in w.__qaProbe.skeletons)) {
++        w.__qaProbe.skeletons[name] = el.getAttribute("aria-busy");
++      }
++    };
++    const scan = (node: Node) => {
++      if (node.nodeType !== Node.ELEMENT_NODE) return;
++      const el = node as Element;
++      record(el);
++      el.querySelectorAll("[data-skeleton]").forEach(record);
++    };
++    new MutationObserver((records) => {
++      for (const r of records) r.addedNodes.forEach(scan);
++    }).observe(document, { childList: true, subtree: true });
++    document.addEventListener("DOMContentLoaded", () => scan(document.documentElement));
++  });
++}
++
++async function readProbe(page: Page): Promise<Probe> {
++  return page.evaluate(() => (window as unknown as { __qaProbe: Probe }).__qaProbe);
++}
++
++/** Let any late layout-shift entries land: two animation frames, then a short idle. */
++async function settle(page: Page) {
++  await page.evaluate(
++    () =>
++      new Promise<void>((resolve) =>
++        requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 500))),
++      ),
++  );
++}
++
++for (const vp of VIEWPORTS) {
++  for (const state of STATES) {
++    for (const route of ROUTES) {
++      test(`R10: ${route.path} ${state.label} at ${vp.label}: skeletons replaced, CLS below ${CLS_LIMIT}, real content visible`, async ({
++        page,
++        context,
++        baseURL,
++      }) => {
++        if (!baseURL) throw new Error("baseURL is not configured");
++        await page.setViewportSize(vp.size);
++        if (state.loggedIn) await addSessionCookie(context, baseURL);
++        await installProbe(page);
++
++        await page.goto(route.path, { waitUntil: "load" });
++
++        // Real content (R10): page h1 / product name and the state's price label are visible.
++        await expect(page.getByRole("heading", { level: 1, name: route.h1, exact: true })).toBeVisible();
++        await expect(page.getByText(state.priceLabel, { exact: true }).first()).toBeVisible();
++
++        // No skeleton left in the visible page once loaded (R10).
++        await expect(page.locator('[aria-busy="true"]').filter({ visible: true })).toHaveCount(0);
++
++        await page.waitForLoadState("networkidle");
++        await settle(page);
++        const probe = await readProbe(page);
++
++        // The load really went through the skeletons this route's boundaries own (R4, R5, R6;
++        // Contract: root data-skeleton values, each with aria-busy="true").
++        for (const name of route.skeletons) {
++          expect.soft(probe.skeletons[name], `skeleton data-skeleton="${name}" shown during load with aria-busy="true"`).toBe(
++            "true",
++          );
++        }
++
++        // Swapping skeletons for content shifts nothing (R8, R10, D-031).
++        expect(probe.cls, `CLS over ${probe.shifts} layout-shift entries`).toBeLessThan(CLS_LIMIT);
++      });
++    }
++  }
++}
+diff --git a/e2e/layout-toggle.nojs.spec.ts b/e2e/layout-toggle.nojs.spec.ts
+deleted file mode 100644
+index be17fde..0000000
+--- a/e2e/layout-toggle.nojs.spec.ts
++++ /dev/null
+@@ -1,75 +0,0 @@
+-// P05 R12 (no-JS) and R13 (project scoping): runs only in the "chromium-no-js" project
+-// (javaScriptEnabled: false). The layout options are real links; prices stay visible.
+-// Written from handoffs/phase-05/spec.md, mock data only (logged out, name order).
+-import { expect, test, type Page } from "@playwright/test";
+-
+-// Logged-out catalog, name order (src/data/products.mock.json, P03 spec table).
+-const PUBLIC_EVERYDAY = ["$14.00", "$28.00", "$16.00", "$12.00", "$24.00", "$32.00", "$11.00", "$9.00"];
+-const PRICE = "Price first";
+-const SPECS = "Specs first";
+-
+-function option(page: Page, text: string) {
+-  return page.locator("a").filter({ hasText: new RegExp(`^\\s*${text}\\s*$`) });
+-}
+-
+-function pathAndSearch(page: Page) {
+-  const u = new URL(page.url());
+-  return u.pathname + u.search;
+-}
+-
+-async function firstCardLabelMinusH2(page: Page) {
+-  const card = page.locator("article").first();
+-  const label = await card.getByText("Everyday price", { exact: true }).boundingBox();
+-  const h2 = await card.locator("h2").first().boundingBox();
+-  if (!label || !h2) throw new Error("first card price label or <h2> not rendered");
+-  return label.y - h2.y;
+-}
+-
+-async function expectAllPricesVisible(page: Page) {
+-  const cards = page.locator("article");
+-  await expect(cards).toHaveCount(PUBLIC_EVERYDAY.length);
+-  for (let i = 0; i < PUBLIC_EVERYDAY.length; i++) {
+-    const card = cards.nth(i);
+-    await expect(card.getByText("Everyday price", { exact: true })).toBeVisible();
+-    await expect(card.getByText(PUBLIC_EVERYDAY[i]).first()).toBeVisible();
+-  }
+-}
+-
+-async function expectSpecsLayoutNoJs(page: Page) {
+-  await expect(page.locator("[data-layout]")).toHaveCount(1);
+-  await expect(page.locator("[data-layout]")).toHaveAttribute("data-layout", "specs");
+-  await expect(option(page, SPECS)).toHaveAttribute("aria-current", "true");
+-  await expect(option(page, PRICE)).not.toHaveAttribute("aria-current");
+-  // No island ran: link semantics only (R5).
+-  await expect(option(page, SPECS)).not.toHaveAttribute("aria-pressed");
+-  await expect(option(page, PRICE)).not.toHaveAttribute("aria-pressed");
+-  await expectAllPricesVisible(page);
+-  expect(await firstCardLabelMinusH2(page), "price label below <h2> in specs layout").toBeGreaterThan(0);
+-}
+-
+-test("R13: this file runs in the chromium-no-js project with JavaScript disabled", async ({}, testInfo) => {
+-  expect(testInfo.project.name).toBe("chromium-no-js");
+-  expect(testInfo.project.use.javaScriptEnabled).toBe(false);
+-});
+-
+-test("R12: no-JS /?layout=specs renders the specs layout with Specs first current and every price visible", async ({
+-  page,
+-}) => {
+-  await page.goto("/?layout=specs");
+-  await expectSpecsLayoutNoJs(page);
+-});
+-
+-test("R12: no-JS / shows the price layout with every price visible", async ({ page }) => {
+-  await page.goto("/");
+-  await expect(page.locator("[data-layout]")).toHaveAttribute("data-layout", "price");
+-  await expect(option(page, PRICE)).toHaveAttribute("aria-current", "true");
+-  await expectAllPricesVisible(page);
+-});
+-
+-test("R12: no-JS clicking Specs first on / navigates via the real link to /?layout=specs", async ({ page }) => {
+-  await page.goto("/");
+-  await expect(option(page, SPECS)).toHaveAttribute("href", "/?layout=specs");
+-  await Promise.all([page.waitForURL((u) => u.pathname + u.search === "/?layout=specs"), option(page, SPECS).click()]);
+-  expect(pathAndSearch(page)).toBe("/?layout=specs");
+-  await expectSpecsLayoutNoJs(page);
+-});
+diff --git a/playwright.config.ts b/playwright.config.ts
+index 6b93fa8..0112de6 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -2,9 +2,9 @@
+ // app with mock data forced, the same env pattern as scripts/verify-ssr.sh (D-021,
+ // architecture.md Tests): CONTENTFUL_* blanked, own SESSION_SECRET.
+ //
+-// P05 R13 (D-009): two projects, scoped by file name.
+-//   chromium        JS enabled, runs every spec except `*.nojs.spec.ts`
+-//   chromium-no-js  javaScriptEnabled: false, runs only `*.nojs.spec.ts`
++// One project, JavaScript enabled (P05 R13). P07 R12 (D-031): the `chromium-no-js` project and
++// `e2e/layout-toggle.nojs.spec.ts` are removed; without JavaScript, streamed content shows only
++// its skeleton, and that is accepted.
+ import { defineConfig, devices } from "@playwright/test";
+ 
+ const PORT = process.env.PLAYWRIGHT_PORT ?? "3220";
+@@ -22,14 +22,8 @@ export default defineConfig({
+   projects: [
+     {
+       name: "chromium",
+-      testIgnore: /\.nojs\.spec\.ts$/,
+       use: { ...devices["Desktop Chrome"] },
+     },
+-    {
+-      name: "chromium-no-js",
+-      testMatch: /\.nojs\.spec\.ts$/,
+-      use: { ...devices["Desktop Chrome"], javaScriptEnabled: false },
+-    },
+   ],
+   webServer: {
+     command: `npm start -- --port ${PORT}`,
+diff --git a/scripts/verify-ssr.sh b/scripts/verify-ssr.sh
+index daef7fa..aae17eb 100755
+--- a/scripts/verify-ssr.sh
++++ b/scripts/verify-ssr.sh
+@@ -1,8 +1,10 @@
+ #!/usr/bin/env bash
+ # SSR checks for the catalog (P03: R7, R13, R15-R23). Later phases extend this file.
+ # P04 additions: product detail (R1-R11), login (R12-R15) and route-level not-found (R2, R16).
+-# P05 additions: layout toggle island (P05 R3, R5, R6; R14 via the R18 loop).
++# P05 additions: layout toggle island (P05 R3, R5, R6).
+ # P04-fix1 additions: proxy 307 for members-only slugs (R4, R10) and the slug-cache log (R11).
++# P07 (D-031): the R18 loop (no streaming wrappers, no fallback / "Loading" text) is removed.
++# Streamed content is part of the response body and counts as present (P07 R11, R12).
+ #
+ # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
+ # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
+@@ -313,9 +315,9 @@ fetch_page bath_specs "/?category=bath&layout=specs"
+ fetch_page bogus "/?layout=bogus"
+ fetch_page specs_member "/?layout=specs" "$GOOD_COOKIE"
+ 
+-# Catalog-only pages, for the R20 "every catalog link keeps state" loop below: P04 adds
+-# non-catalog pages (detail, login, not-found) to $FETCHED for the R18 streaming check,
+-# but those never render the catalog's Clear-filters link or filter chips.
++# Catalog-only pages, for the R20 "every catalog link keeps state" loop below: the pages
++# fetched after this point (detail, login, not-found) never render the catalog's
++# Clear-filters link or filter chips.
+ CATALOG_FETCHED="$FETCHED"
+ 
+ # P04: product detail, login, not-found
+@@ -475,15 +477,6 @@ check "R7: footer text 'Tiny Confetti demo catalog'" has "$P" "Tiny Confetti dem
+ check "R7: footer text 'Prices in USD. Member prices need sign-in.'" has "$P" "Prices in USD. Member prices need sign-in."
+ check "R7: '<footer' occurs at least once" count_ge "$P" "<footer" 1
+ 
+-# --- R18 (and R13): no streaming, no fallback, on every fetched page --------
+-for name in $FETCHED; do
+-  P="$(page "$name")"
+-  check "R18: [$name] no '<div hidden id=\"S:'" lacks "$P" '<div hidden id="S:'
+-  check "R18: [$name] no pending boundary '<!--\$?-->'" lacks "$P" '<!--$?-->'
+-  check "R18: [$name] no '<template id=\"B:'" lacks "$P" '<template id="B:'
+-  check "R18: [$name] no 'Loading'" lacks "$P" "Loading"
+-done
+-
+ # --- R23: really ran on mock data -------------------------------------------
+ check "R23: server log contains '[products] source: mock'" has "$LOG" "[products] source: mock"
+ 
+@@ -510,7 +503,9 @@ check "R4: contains sentence 'Members get lower prices on every toy.'" has "$P"
+ # --- R7: breadcrumb (Cloud Bunny Plush) -------------------------------------
+ check "R7: breadcrumb 'Catalog' links to /" has "$P" 'href="/">Catalog<'
+ check "R7: breadcrumb category link is Plush -> /?category=plush" has "$P" 'href="/?category=plush">Plush<'
+-check "R7: breadcrumb reads Catalog, Plush, product name in order" in_order "$P" ">Catalog<" ">Plush<" "Cloud Bunny Plush"
++# Needles are anchored to element text (">...<", as in R22): with the detail body streamed
++# (P07 R6), the RSC flight data that precedes the boundary's HTML also carries the bare name.
++check "R7: breadcrumb reads Catalog, Plush, product name in order" in_order "$P" ">Catalog<" ">Plush<" ">Cloud Bunny Plush<"
+ check "R7: product name in the breadcrumb is plain text, not a link" lacks "$P" ">Cloud Bunny Plush</a>"
+ 
+ # --- R8: image frame (Cloud Bunny Plush has an image) -----------------------
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 69dd28a..6b686ae 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -43,6 +43,7 @@
+ 
+   --animate-pop-in: pop-in 400ms var(--ease-bounce);
+   --animate-wiggle: wiggle 400ms var(--ease-bounce);
++  --animate-skeleton-pulse: skeleton-pulse 1.6s ease-in-out infinite;
+ 
+   @keyframes pop-in {
+     from {
+@@ -55,6 +56,17 @@
+     }
+   }
+ 
++  /* Skeleton pulse (docs/design.md Skeleton): opacity only, so it never moves layout. */
++  @keyframes skeleton-pulse {
++    0%,
++    100% {
++      opacity: 1;
++    }
++    50% {
++      opacity: 0.5;
++    }
++  }
++
+   @keyframes wiggle {
+     0%,
+     100% {
+@@ -137,6 +149,18 @@
+   .sticker-card.sticker-member:hover {
+     box-shadow: var(--shadow-sticker-member-hover);
+   }
++
++  /* Suspense skeleton blocks (src/components/skeletons.tsx). */
++  .skeleton-pulse {
++    animation: var(--animate-skeleton-pulse);
++  }
++}
++
++/* No skeleton pulse when the visitor asks for less motion (docs/design.md Motion, Skeleton). */
++@media (prefers-reduced-motion: reduce) {
++  .skeleton-pulse {
++    animation: none;
++  }
+ }
+ 
+ /*
+diff --git a/src/app/login/page.tsx b/src/app/login/page.tsx
+index 320f2e4..9d29280 100644
+--- a/src/app/login/page.tsx
++++ b/src/app/login/page.tsx
+@@ -1,27 +1,33 @@
+ import { ArrowRight } from "lucide-react";
+ import Link from "next/link";
+ import { redirect } from "next/navigation";
++import { Suspense } from "react";
+ 
+ import { Alert } from "@/components/alert";
+ import { ConfettiCluster } from "@/components/confetti";
+ import { SiteHeader } from "@/components/site-header";
+-import { BUTTON_PRIMARY, CARD_BASE, CONTAINER, LABEL, TEXT_LINK } from "@/components/ui-classes";
++import { LoginCardSkeleton } from "@/components/skeletons";
++import {
++  BUTTON_PRIMARY,
++  CONTAINER,
++  FORM_FIELD,
++  INPUT,
++  LABEL,
++  LOGIN_CARD_FRAME,
++  LOGIN_FORM,
++  LOGIN_INTRO,
++  LOGIN_NOTE,
++  LOGIN_TITLE_TEXT,
++  TEXT_LINK,
++} from "@/components/ui-classes";
+ import { login } from "@/lib/auth/actions";
+ import { safeNextPath } from "@/lib/auth/next-path";
+ import { verifySession } from "@/lib/dal";
+ 
+-const INPUT = "min-h-12 rounded-lg border-2 border-input-border bg-input px-4 placeholder:text-muted-foreground focus:border-accent focus:shadow-pop-accent";
+-
+-// Reads the session to redirect logged-in visitors to "/" before rendering the form (D-020).
+-export const instant = false;
+-
+-export default async function LoginPage(props: PageProps<"/login">) {
+-  const { next: rawNext, error } = await props.searchParams;
+-  const next = safeNextPath(rawNext);
+-
+-  const session = await verifySession();
+-  if (session) redirect("/");
+-
++// The minimal header and the page frame are static. The card reads searchParams (`next`, `error`)
++// and the session, so it streams in behind Suspense with a same-size skeleton (D-031). A visitor
++// with a valid session is normally sent to "/" by src/proxy.ts before rendering (D-032).
++export default function LoginPage(props: PageProps<"/login">) {
+   return (
+     <>
+       <SiteHeader variant="minimal" />
+@@ -30,49 +36,9 @@ export default async function LoginPage(props: PageProps<"/login">) {
+           <ConfettiCluster className="pointer-events-none absolute -top-2 left-4 hidden h-12 w-24 md:block" />
+           <ConfettiCluster className="pointer-events-none absolute -bottom-2 right-4 hidden h-12 w-24 md:block" />
+ 
+-          <div className={`${CARD_BASE} sticker-member relative w-full max-w-md p-6 md:p-8`}>
+-            <h1 className="font-heading text-2xl font-extrabold">Sign in</h1>
+-            <p className="mt-2 text-muted-foreground">Sign in to see member prices and members-only toys.</p>
+-            <p className="mt-1 text-sm text-muted-foreground">This is a demo, so any username and password work.</p>
+-
+-            {error === "missing" && (
+-              <div className="mt-4">
+-                <Alert>Enter a username and password to sign in.</Alert>
+-              </div>
+-            )}
+-
+-            <form action={login} className="mt-6 flex flex-col gap-4">
+-              <div className="flex flex-col gap-2">
+-                <label htmlFor="username" className={LABEL}>
+-                  Username
+-                </label>
+-                <input id="username" name="username" placeholder="demo" required className={INPUT} />
+-              </div>
+-
+-              <div className="flex flex-col gap-2">
+-                <label htmlFor="password" className={LABEL}>
+-                  Password
+-                </label>
+-                <input
+-                  id="password"
+-                  name="password"
+-                  type="password"
+-                  placeholder="Any password"
+-                  required
+-                  className={INPUT}
+-                />
+-              </div>
+-
+-              {next !== null && <input type="hidden" name="next" value={next} />}
+-
+-              <button type="submit" className={`${BUTTON_PRIMARY} w-full`}>
+-                Sign in
+-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-card text-accent-strong">
+-                  <ArrowRight aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
+-                </span>
+-              </button>
+-            </form>
+-          </div>
++          <Suspense fallback={<LoginCardSkeleton />}>
++            <LoginCard searchParams={props.searchParams} />
++          </Suspense>
+ 
+           <Link href="/" className={TEXT_LINK}>
+             Continue browsing without signing in
+@@ -82,3 +48,50 @@ export default async function LoginPage(props: PageProps<"/login">) {
+     </>
+   );
+ }
++
++async function LoginCard({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
++  const { next: rawNext, error } = await searchParams;
++  const next = safeNextPath(rawNext);
++
++  const session = await verifySession();
++  if (session) redirect("/");
++
++  return (
++    <div className={LOGIN_CARD_FRAME}>
++      <h1 className={LOGIN_TITLE_TEXT}>Sign in</h1>
++      <p className={`${LOGIN_INTRO} text-muted-foreground`}>Sign in to see member prices and members-only toys.</p>
++      <p className={LOGIN_NOTE}>This is a demo, so any username and password work.</p>
++
++      {error === "missing" && (
++        <div className="mt-4">
++          <Alert>Enter a username and password to sign in.</Alert>
++        </div>
++      )}
++
++      <form action={login} className={LOGIN_FORM}>
++        <div className={FORM_FIELD}>
++          <label htmlFor="username" className={LABEL}>
++            Username
++          </label>
++          <input id="username" name="username" placeholder="demo" required className={INPUT} />
++        </div>
++
++        <div className={FORM_FIELD}>
++          <label htmlFor="password" className={LABEL}>
++            Password
++          </label>
++          <input id="password" name="password" type="password" placeholder="Any password" required className={INPUT} />
++        </div>
++
++        {next !== null && <input type="hidden" name="next" value={next} />}
++
++        <button type="submit" className={`${BUTTON_PRIMARY} w-full`}>
++          Sign in
++          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-card text-accent-strong">
++            <ArrowRight aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
++          </span>
++        </button>
++      </form>
++    </div>
++  );
++}
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+index 79847f5..0ba90af 100644
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -1,3 +1,5 @@
++import { Suspense } from "react";
++
+ import { Banner } from "@/components/banner";
+ import { parseCatalogParams } from "@/components/catalog-params";
+ import { LayoutProvider } from "@/components/client/layout-toggle";
+@@ -6,33 +8,51 @@ import { FilterCard } from "@/components/filter-card";
+ import { LOGGED_OUT_BANNER_TEXT, memberBannerText } from "@/components/format";
+ import { ProductGrid } from "@/components/product-grid";
+ import { SiteHeader } from "@/components/site-header";
++import { BannerSkeleton, CatalogSkeleton } from "@/components/skeletons";
+ import { TitleArea } from "@/components/title-area";
+-import { CONTAINER } from "@/components/ui-classes";
++import { CATALOG_STACK, CONTAINER } from "@/components/ui-classes";
+ import { getProducts, verifySession } from "@/lib/dal";
+ import { filterProducts } from "@/lib/products/filter";
+ 
+-// Render fully on the server per request: prices and Set B are in the initial HTML (D-020).
+-export const instant = false;
+-
+-export default async function CatalogPage(props: PageProps<"/">) {
+-  const params = parseCatalogParams(await props.searchParams);
+-  const [session, products] = await Promise.all([verifySession(), getProducts()]);
+-  const visible = filterProducts(products, { category: params.category, q: params.q });
+-  const membersOnlyCount = products.filter((p) => p.visibility === "authenticated").length;
+-
++// The page shell (header frame, title area, container) is static. The parts that read request
++// data (session, searchParams) stream in behind Suspense with same-size skeletons (D-031); prices
++// and Set B still arrive in the same HTML response, rendered by server components only.
++export default function CatalogPage(props: PageProps<"/">) {
+   return (
+     <>
+       <SiteHeader variant="session" />
+       <main className="flex-1">
+-        <Banner text={session !== null ? memberBannerText(membersOnlyCount) : LOGGED_OUT_BANNER_TEXT} />
++        <Suspense fallback={<BannerSkeleton />}>
++          <CatalogBanner />
++        </Suspense>
+         <TitleArea />
+-        <div className={`${CONTAINER} flex flex-col gap-10`}>
+-          <LayoutProvider layout={params.layout}>
+-            <FilterCard params={params} count={visible.length} />
+-            {visible.length > 0 ? <ProductGrid products={visible} /> : <EmptyState q={params.q} />}
+-          </LayoutProvider>
++        <div className={`${CONTAINER} ${CATALOG_STACK}`}>
++          <Suspense fallback={<CatalogSkeleton />}>
++            <Catalog searchParams={props.searchParams} />
++          </Suspense>
+         </div>
+       </main>
+     </>
+   );
+ }
++
++/** Session-dependent sentence; the logged-in one counts the members-only products. */
++async function CatalogBanner() {
++  const [session, products] = await Promise.all([verifySession(), getProducts()]);
++  const membersOnlyCount = products.filter((p) => p.visibility === "authenticated").length;
++  return <Banner text={session !== null ? memberBannerText(membersOnlyCount) : LOGGED_OUT_BANNER_TEXT} />;
++}
++
++/** Filter card, count and grid (or empty state): validated searchParams, filtered on the server. */
++async function Catalog({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
++  const params = parseCatalogParams(await searchParams);
++  const products = await getProducts();
++  const visible = filterProducts(products, { category: params.category, q: params.q });
++
++  return (
++    <LayoutProvider layout={params.layout}>
++      <FilterCard params={params} count={visible.length} />
++      {visible.length > 0 ? <ProductGrid products={visible} /> : <EmptyState q={params.q} />}
++    </LayoutProvider>
++  );
++}
+diff --git a/src/app/products/[slug]/page.tsx b/src/app/products/[slug]/page.tsx
+index a1bbe74..5caf294 100644
+--- a/src/app/products/[slug]/page.tsx
++++ b/src/app/products/[slug]/page.tsx
+@@ -1,7 +1,7 @@
+ import { Check } from "lucide-react";
+ import Link from "next/link";
+ import { notFound, redirect } from "next/navigation";
+-import { connection } from "next/server";
++import { Suspense } from "react";
+ 
+ import { MembersOnlyBadge } from "@/components/badge";
+ import { catalogHref } from "@/components/catalog-params";
+@@ -9,17 +9,50 @@ import { CATEGORY_META } from "@/components/categories";
+ import { Price } from "@/components/price";
+ import { ProductImageFrame } from "@/components/product-image-frame";
+ import { SiteHeader } from "@/components/site-header";
+-import { BUTTON_SECONDARY, CARD_BASE, COLOR_CLASSES, CONTAINER, LABEL, TEXT_LINK } from "@/components/ui-classes";
++import { ProductDetailSkeleton } from "@/components/skeletons";
++import {
++  BREADCRUMB_TEXT,
++  BUTTON_SECONDARY,
++  COLOR_CLASSES,
++  DETAIL_BODY,
++  DETAIL_CATEGORY_ROW,
++  DETAIL_GRID,
++  DETAIL_IMAGE_COLUMN,
++  DETAIL_IMAGE_SIZE,
++  DETAIL_INFO_COLUMN,
++  DETAIL_PRICE_CARD,
++  DETAIL_PRICE_FOOTER,
++  DETAIL_PRICE_FOOTER_STACK,
++  DETAIL_SPECS,
++  DETAIL_TITLE_TEXT,
++  FEATURE_ICON,
++  FEATURE_ITEM,
++  FEATURE_LIST,
++  ICON_CIRCLE,
++  LABEL,
++  SECTION_HEADING,
++  TEXT_LINK,
++} from "@/components/ui-classes";
+ import { getProductBySlug } from "@/lib/dal";
+ 
+-// Render fully on the server per request: prices and Set B are in the initial HTML (D-020).
+-export const instant = false;
++// The header frame is static; everything that depends on `params` and the DAL (session) streams
++// in behind Suspense with a same-size skeleton (D-031). A logged-out Set B slug never gets here:
++// src/proxy.ts answers 307 first (D-032). The page still handles the DAL's result itself.
++export default function ProductPage(props: PageProps<"/products/[slug]">) {
++  return (
++    <>
++      <SiteHeader variant="session" />
++      <main className="flex-1">
++        <Suspense fallback={<ProductDetailSkeleton />}>
++          <ProductDetail params={props.params} />
++        </Suspense>
++      </main>
++    </>
++  );
++}
+ 
+-export default async function ProductPage(props: PageProps<"/products/[slug]">) {
+-  // Mark the whole page as request-time so it builds as fully dynamic (not a
+-  // partial prerender) and notFound()/redirect() set real 404/307 statuses.
+-  await connection();
+-  const { slug } = await props.params;
++async function ProductDetail({ params }: { params: PageProps<"/products/[slug]">["params"] }) {
++  const { slug } = await params;
+   const result = await getProductBySlug(slug);
+ 
+   if (result.status === "not-found") notFound();
+@@ -33,97 +66,93 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">)
+   const isMember = product.priceTier === "member";
+ 
+   return (
+-    <>
+-      <SiteHeader variant="session" />
+-      <main className="flex-1">
+-        <div className={`${CONTAINER} flex flex-col gap-6 py-8`}>
+-          <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
+-            <Link href="/" className={TEXT_LINK}>
+-              Catalog
+-            </Link>
+-            <span aria-hidden="true"> / </span>
+-            <Link href={catalogHref({ category: product.category })} className={TEXT_LINK}>
+-              {meta.label}
+-            </Link>
+-            <span aria-hidden="true"> / </span>
+-            <span>{product.name}</span>
+-          </nav>
++    <div className={DETAIL_BODY}>
++      <nav aria-label="Breadcrumb" className={`${BREADCRUMB_TEXT} text-muted-foreground`}>
++        <Link href="/" className={TEXT_LINK}>
++          Catalog
++        </Link>
++        <span aria-hidden="true"> / </span>
++        <Link href={catalogHref({ category: product.category })} className={TEXT_LINK}>
++          {meta.label}
++        </Link>
++        <span aria-hidden="true"> / </span>
++        <span>{product.name}</span>
++      </nav>
+ 
+-          <div className="grid gap-8 lg:grid-cols-12">
+-            <div className="lg:col-span-7">
+-              <ProductImageFrame
+-                shape="blob"
+-                image={product.image}
+-                name={product.name}
+-                category={product.category}
+-                className="mx-auto max-w-md"
+-              />
+-            </div>
++      <div className={DETAIL_GRID}>
++        <div className={DETAIL_IMAGE_COLUMN}>
++          <ProductImageFrame
++            shape="blob"
++            image={product.image}
++            name={product.name}
++            category={product.category}
++            className={DETAIL_IMAGE_SIZE}
++          />
++        </div>
+ 
+-            <div className="flex flex-col gap-4 lg:col-span-5">
+-              <div className="flex items-center gap-2">
+-                <span
+-                  className={`inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-foreground text-foreground ${colors.fill}`}
+-                >
+-                  <Icon aria-hidden="true" strokeWidth={2.5} className="h-5 w-5" />
+-                </span>
+-                <span className={LABEL}>{meta.label}</span>
+-              </div>
++        <div className={DETAIL_INFO_COLUMN}>
++          <div className={DETAIL_CATEGORY_ROW}>
++            <span
++              className={`${ICON_CIRCLE} inline-flex items-center justify-center rounded-full border-2 border-foreground text-foreground ${colors.fill}`}
++            >
++              <Icon aria-hidden="true" strokeWidth={2.5} className="h-5 w-5" />
++            </span>
++            <span className={LABEL}>{meta.label}</span>
++          </div>
+ 
+-              <div className="flex flex-wrap items-center gap-2">
+-                <h1 className="font-heading text-title-sm leading-tight font-extrabold md:text-title">
+-                  {product.name}
+-                </h1>
+-                {membersOnly && <MembersOnlyBadge />}
+-              </div>
++          <div className="flex flex-wrap items-center gap-2">
++            <h1 className={DETAIL_TITLE_TEXT}>{product.name}</h1>
++            {membersOnly && <MembersOnlyBadge />}
++          </div>
+ 
+-              <p className="text-muted-foreground">{product.description}</p>
++          <p className="text-muted-foreground">{product.description}</p>
+ 
+-              <div className={`${CARD_BASE} sticker p-4`}>
+-                <Price amount={product.price} tier={product.priceTier} />
+-                {!isMember && (
+-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t-2 border-border pt-3">
+-                    <p className="text-sm text-muted-foreground">Members get lower prices on every toy.</p>
+-                    <Link href={`/login?next=/products/${product.slug}`} className={BUTTON_SECONDARY}>
+-                      Sign in for member pricing
+-                    </Link>
+-                  </div>
+-                )}
++          {/* Same height in both states (DETAIL_PRICE_FOOTER), so the skeleton matches either. */}
++          <div className={DETAIL_PRICE_CARD}>
++            <Price amount={product.price} tier={product.priceTier} />
++            {isMember ? (
++              <div aria-hidden="true" className={`${DETAIL_PRICE_FOOTER} border-transparent`} />
++            ) : (
++              <div className={`${DETAIL_PRICE_FOOTER} ${DETAIL_PRICE_FOOTER_STACK}`}>
++                <p className="text-sm text-muted-foreground">Members get lower prices on every toy.</p>
++                <Link href={`/login?next=/products/${product.slug}`} className={BUTTON_SECONDARY}>
++                  Sign in for member pricing
++                </Link>
+               </div>
++            )}
++          </div>
+ 
+-              <section>
+-                <h2 className="mb-2 font-heading text-lg font-bold">Details</h2>
+-                <dl className={`${CARD_BASE} grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 p-4 text-sm`}>
+-                  <dt className="font-bold">Age range</dt>
+-                  <dd className="text-right">{product.ageRange}</dd>
+-                  <dt className="font-bold">Material</dt>
+-                  <dd className="text-right">{product.material}</dd>
+-                </dl>
+-              </section>
++          <section>
++            <h2 className={SECTION_HEADING}>Details</h2>
++            <dl className={DETAIL_SPECS}>
++              <dt className="font-bold">Age range</dt>
++              <dd className="text-right">{product.ageRange}</dd>
++              <dt className="font-bold">Material</dt>
++              <dd className="text-right">{product.material}</dd>
++            </dl>
++          </section>
+ 
+-              {product.features.length > 0 && (
+-                <section>
+-                  <h2 className="mb-2 font-heading text-lg font-bold">What makes it special</h2>
+-                  <ul className="flex flex-col gap-2 text-sm">
+-                    {product.features.map((feature) => (
+-                      <li key={feature} className="flex items-center gap-2">
+-                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-quaternary text-foreground">
+-                          <Check aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5" />
+-                        </span>
+-                        {feature}
+-                      </li>
+-                    ))}
+-                  </ul>
+-                </section>
+-              )}
++          {product.features.length > 0 && (
++            <section>
++              <h2 className={SECTION_HEADING}>What makes it special</h2>
++              <ul className={FEATURE_LIST}>
++                {product.features.map((feature) => (
++                  <li key={feature} className={FEATURE_ITEM}>
++                    <span className={`${FEATURE_ICON} inline-flex items-center justify-center rounded-full bg-quaternary text-foreground`}>
++                      <Check aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5" />
++                    </span>
++                    {feature}
++                  </li>
++                ))}
++              </ul>
++            </section>
++          )}
+ 
+-              <Link href="/" className={TEXT_LINK}>
+-                Back to catalog
+-              </Link>
+-            </div>
+-          </div>
++          <Link href="/" className={TEXT_LINK}>
++            Back to catalog
++          </Link>
+         </div>
+-      </main>
+-    </>
++      </div>
++    </div>
+   );
+ }
+diff --git a/src/components/banner.tsx b/src/components/banner.tsx
+index d8dcfe1..04ec9bb 100644
+--- a/src/components/banner.tsx
++++ b/src/components/banner.tsx
+@@ -1,10 +1,13 @@
+-import { CONTAINER } from "@/components/ui-classes";
++import { BANNER_FRAME, BANNER_INNER, CONTAINER } from "@/components/ui-classes";
+ 
+-/** White strip under the header; `text` is one string so it stays one text node. */
++/**
++ * White strip under the header; `text` is one string so it stays one text node. Frame and min
++ * height are shared with BannerSkeleton, so the swap does not move the title area below.
++ */
+ export function Banner({ text }: { text: string }) {
+   return (
+-    <div className="border-b-2 border-border bg-card">
+-      <p className={`${CONTAINER} py-3 text-sm font-medium`}>{text}</p>
++    <div className={BANNER_FRAME}>
++      <p className={`${CONTAINER} ${BANNER_INNER}`}>{text}</p>
+     </div>
+   );
+ }
+diff --git a/src/components/client/layout-toggle.tsx b/src/components/client/layout-toggle.tsx
+index 31a73f8..1297368 100644
+--- a/src/components/client/layout-toggle.tsx
++++ b/src/components/client/layout-toggle.tsx
+@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
+ import { createContext, use, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+ 
+ import { parseCatalogParams, type CatalogLayout } from "@/components/catalog-params";
++import { LAYOUT_OPTION } from "@/components/ui-classes";
+ 
+ // UI state only (D-019): the current layout. Cards, prices and Set B arrive as server `children`.
+ const LayoutContext = createContext<CatalogLayout | null>(null);
+@@ -87,7 +88,7 @@ export function LayoutToggle({ hrefs }: { hrefs: Record<CatalogLayout, string> }
+             prefetch={false}
+             onClick={(event) => onClick(event, option.value)}
+             {...state}
+-            className={`inline-flex min-h-12 items-center rounded-full border-2 px-4 text-sm font-bold ${
++            className={`${LAYOUT_OPTION} ${
+               active ? "border-foreground bg-card shadow-pop" : "border-transparent text-muted-foreground"
+             }`}
+           >
+diff --git a/src/components/filter-card.tsx b/src/components/filter-card.tsx
+index a729938..f9f750c 100644
+--- a/src/components/filter-card.tsx
++++ b/src/components/filter-card.tsx
+@@ -6,31 +6,45 @@ import { catalogHref, type CatalogParams } from "@/components/catalog-params";
+ import { CATEGORY_META } from "@/components/categories";
+ import { LayoutToggle } from "@/components/client/layout-toggle";
+ import { formatToyCount } from "@/components/format";
+-import { BUTTON_PRIMARY, BUTTON_SECONDARY, CARD_BASE, COLOR_CLASSES, LABEL } from "@/components/ui-classes";
++import {
++  BUTTON_PRIMARY,
++  BUTTON_SECONDARY,
++  CATEGORY_CHIP,
++  CHIP_ROW,
++  COLOR_CLASSES,
++  COUNT_TEXT,
++  FILTER_CARD_FRAME,
++  FILTER_FOOTER_ROW,
++  FILTER_LAYOUT_COLUMN,
++  FILTER_SEARCH_COLUMN,
++  FILTER_SEARCH_ROW,
++  FILTER_TOP_ROW,
++  INPUT,
++  LABEL,
++  LAYOUT_TRACK,
++  SEARCH_INPUT_SIZE,
++} from "@/components/ui-classes";
+ import { CATEGORIES, type Category } from "@/schemas/product";
+ 
+-const CHIP =
+-  "inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-foreground px-4 text-sm font-bold";
+-
+ /** Search (GET form), category chips, layout toggle (island; real links without JS), count and Clear filters. Works without JS. */
+ export function FilterCard({ params, count }: { params: CatalogParams; count: number }) {
+   const { category, q, layout } = params;
+ 
+   return (
+-    <section aria-label="Filters" className={`${CARD_BASE} sticker flex flex-col gap-5 p-4 md:p-6`}>
+-      <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+-        <Form action="/" className="flex flex-1 flex-col gap-2 md:max-w-xl">
++    <section aria-label="Filters" className={FILTER_CARD_FRAME}>
++      <div className={FILTER_TOP_ROW}>
++        <Form action="/" className={FILTER_SEARCH_COLUMN}>
+           <label htmlFor="catalog-search" className={LABEL}>
+             Search
+           </label>
+-          <div className="flex flex-col gap-3 sm:flex-row">
++          <div className={FILTER_SEARCH_ROW}>
+             <input
+               id="catalog-search"
+               type="search"
+               name="q"
+               defaultValue={q}
+               placeholder="Search toys by name or feature"
+-              className="min-h-12 flex-1 rounded-lg border-2 border-input-border bg-input px-4 placeholder:text-muted-foreground focus:border-accent focus:shadow-pop-accent"
++              className={`${INPUT} ${SEARCH_INPUT_SIZE}`}
+             />
+             {category && <input type="hidden" name="category" value={category} />}
+             {layout === "specs" && <input type="hidden" name="layout" value="specs" />}
+@@ -41,14 +55,14 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
+           </div>
+         </Form>
+ 
+-        <div className="flex flex-col gap-2">
++        <div className={FILTER_LAYOUT_COLUMN}>
+           <p id="layout-label" className={LABEL}>
+             Layout
+           </p>
+           <div
+             role="group"
+             aria-labelledby="layout-label"
+-            className="inline-flex w-fit gap-1 rounded-full border-2 border-foreground bg-muted p-1"
++            className={`${LAYOUT_TRACK} border-foreground bg-muted`}
+           >
+             <LayoutToggle
+               hrefs={{
+@@ -61,7 +75,7 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
+       </div>
+ 
+       <nav aria-label="Categories">
+-        <ul className="flex flex-wrap gap-2">
++        <ul className={CHIP_ROW}>
+           <li>
+             <CategoryChip label="All" href={catalogHref({ category: null, q, layout })} active={category === null} />
+           </li>
+@@ -78,8 +92,8 @@ export function FilterCard({ params, count }: { params: CatalogParams; count: nu
+         </ul>
+       </nav>
+ 
+-      <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-border pt-4">
+-        <p className="font-heading text-lg font-bold">{formatToyCount(count)}</p>
++      <div className={FILTER_FOOTER_ROW}>
++        <p className={COUNT_TEXT}>{formatToyCount(count)}</p>
+         <Link href="/" className={BUTTON_SECONDARY}>
+           Clear filters
+         </Link>
+@@ -105,7 +119,7 @@ function CategoryChip({
+     <Link
+       href={href}
+       aria-current={active ? "true" : undefined}
+-      className={`${CHIP} ${active ? activeClasses : "bg-card text-foreground hover:bg-muted"}`}
++      className={`${CATEGORY_CHIP} ${active ? activeClasses : "bg-card text-foreground hover:bg-muted"}`}
+     >
+       {colors && (
+         <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-full border-2 border-foreground ${colors.fill}`} />
+diff --git a/src/components/price.tsx b/src/components/price.tsx
+index 56f74c5..4909149 100644
+--- a/src/components/price.tsx
++++ b/src/components/price.tsx
+@@ -1,18 +1,16 @@
+ import { formatPrice } from "@/components/format";
+-import { LABEL } from "@/components/ui-classes";
++import { LABEL, PRICE_AMOUNT_TEXT, PRICE_STACK } from "@/components/ui-classes";
+ import type { PriceTier } from "@/lib/products/types";
+ 
+ /** Renders the one price the DAL chose; the tier only picks the label and colour. */
+ export function Price({ amount, tier, className = "" }: { amount: number; tier: PriceTier; className?: string }) {
+   const member = tier === "member";
+   return (
+-    <div className={`flex flex-col ${className}`}>
++    <div className={`${PRICE_STACK} ${className}`}>
+       <span className={`${LABEL} ${member ? "text-accent-strong" : "text-muted-foreground"}`}>
+         {member ? "Member price" : "Everyday price"}
+       </span>
+-      <span
+-        className={`font-heading text-2xl font-extrabold tabular-nums ${member ? "text-accent-strong" : "text-foreground"}`}
+-      >
++      <span className={`${PRICE_AMOUNT_TEXT} ${member ? "text-accent-strong" : "text-foreground"}`}>
+         {formatPrice(amount)}
+       </span>
+     </div>
+diff --git a/src/components/product-card.tsx b/src/components/product-card.tsx
+index 03b789f..127d634 100644
+--- a/src/components/product-card.tsx
++++ b/src/components/product-card.tsx
+@@ -5,7 +5,15 @@ import { MembersOnlyBadge } from "@/components/badge";
+ import { CATEGORY_META } from "@/components/categories";
+ import { Price } from "@/components/price";
+ import { ProductImageFrame } from "@/components/product-image-frame";
+-import { COLOR_CLASSES } from "@/components/ui-classes";
++import {
++  CARD_META_TEXT,
++  COLOR_CLASSES,
++  PRODUCT_CARD_BODY,
++  PRODUCT_CARD_FRAME,
++  PRODUCT_CARD_ICON,
++  PRODUCT_CARD_IMAGE_BOX,
++  PRODUCT_NAME_TEXT,
++} from "@/components/ui-classes";
+ import type { CatalogProduct } from "@/lib/products/types";
+ 
+ /**
+@@ -23,9 +31,9 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
+   return (
+     <article
+       style={{ "--i": index } as CSSProperties}
+-      className={`pop-in sticker-card ${membersOnly ? "sticker-member" : "sticker"} relative flex flex-col rounded-xl border-2 border-foreground bg-card group-data-[layout=specs]:sm:flex-row`}
++      className={`pop-in sticker-card ${membersOnly ? "sticker-member" : "sticker"} ${PRODUCT_CARD_FRAME} group-data-[layout=specs]:sm:flex-row`}
+     >
+-      <div className="p-3 group-data-[layout=specs]:sm:w-40 group-data-[layout=specs]:sm:shrink-0 group-data-[layout=specs]:sm:pr-0">
++      <div className={`${PRODUCT_CARD_IMAGE_BOX} group-data-[layout=specs]:sm:w-40 group-data-[layout=specs]:sm:shrink-0 group-data-[layout=specs]:sm:pr-0`}>
+         <ProductImageFrame
+           image={product.image}
+           name={product.name}
+@@ -34,9 +42,9 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
+         />
+       </div>
+ 
+-      <div className="flex flex-1 flex-col gap-2 px-4 pb-4 group-data-[layout=specs]:pt-3">
++      <div className={`${PRODUCT_CARD_BODY} group-data-[layout=specs]:pt-3`}>
+         <span
+-          className={`wiggle -mt-5 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-foreground text-foreground ${colors.fill} order-1 group-data-[layout=specs]:hidden`}
++          className={`wiggle ${PRODUCT_CARD_ICON} inline-flex items-center justify-center rounded-full border-2 border-foreground text-foreground ${colors.fill} order-1 group-data-[layout=specs]:hidden`}
+         >
+           <Icon aria-hidden="true" strokeWidth={2.5} className="h-5 w-5" />
+         </span>
+@@ -48,7 +56,7 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
+         />
+ 
+         <div className="order-3 flex flex-wrap items-center gap-2 group-data-[layout=specs]:order-1">
+-          <h2 className="font-heading text-lg leading-snug font-bold">
++          <h2 className={PRODUCT_NAME_TEXT}>
+             <Link
+               href={"/products/" + product.slug}
+               className="rounded-sm after:absolute after:inset-0 after:rounded-xl"
+@@ -59,7 +67,7 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
+           {membersOnly && <MembersOnlyBadge />}
+         </div>
+ 
+-        <p className="order-4 flex items-center gap-2 text-sm font-medium text-muted-foreground group-data-[layout=specs]:order-2">
++        <p className={`${CARD_META_TEXT} order-4 flex items-center gap-2 font-medium text-muted-foreground group-data-[layout=specs]:order-2`}>
+           <span
+             className={`wiggle hidden h-7 w-7 items-center justify-center rounded-full border-2 border-foreground text-foreground group-data-[layout=specs]:inline-flex ${colors.fill}`}
+           >
+@@ -68,7 +76,7 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
+           {meta.label}
+         </p>
+ 
+-        <p className="order-5 text-sm text-muted-foreground group-data-[layout=specs]:hidden">
++        <p className={`${CARD_META_TEXT} order-5 text-muted-foreground group-data-[layout=specs]:hidden`}>
+           {`${product.ageRange} · ${product.material}`}
+         </p>
+ 
+diff --git a/src/components/product-grid.tsx b/src/components/product-grid.tsx
+index b944a69..6f19802 100644
+--- a/src/components/product-grid.tsx
++++ b/src/components/product-grid.tsx
+@@ -1,5 +1,6 @@
+ import { LayoutGrid } from "@/components/client/layout-toggle";
+ import { ProductCard } from "@/components/product-card";
++import { PRODUCT_GRID_COLUMNS } from "@/components/ui-classes";
+ import type { CatalogProduct } from "@/lib/products/types";
+ 
+ /**
+@@ -10,7 +11,7 @@ import type { CatalogProduct } from "@/lib/products/types";
+ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
+   return (
+     <LayoutGrid>
+-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 group-data-[layout=specs]:sm:grid-cols-1 group-data-[layout=specs]:md:grid-cols-2 group-data-[layout=specs]:lg:grid-cols-2 group-data-[layout=specs]:xl:grid-cols-2">
++      <div className={`${PRODUCT_GRID_COLUMNS} group-data-[layout=specs]:sm:grid-cols-1 group-data-[layout=specs]:md:grid-cols-2 group-data-[layout=specs]:lg:grid-cols-2 group-data-[layout=specs]:xl:grid-cols-2`}>
+         {products.map((product, index) => (
+           <ProductCard key={product.id} product={product} index={index} />
+         ))}
+diff --git a/src/components/product-image-frame.tsx b/src/components/product-image-frame.tsx
+index ef18871..dc876e1 100644
+--- a/src/components/product-image-frame.tsx
++++ b/src/components/product-image-frame.tsx
+@@ -2,7 +2,7 @@ import { ImageOff } from "lucide-react";
+ import Image from "next/image";
+ 
+ import { CATEGORY_META } from "@/components/categories";
+-import { COLOR_CLASSES } from "@/components/ui-classes";
++import { COLOR_CLASSES, IMAGE_BOX } from "@/components/ui-classes";
+ import type { ProductImage } from "@/lib/products/types";
+ import type { Category } from "@/schemas/product";
+ 
+@@ -31,7 +31,7 @@ export function ProductImageFrame({
+   if (!image) {
+     return (
+       <div
+-        className={`flex aspect-square w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-input-border bg-muted p-3 text-center ${radius} ${className}`}
++        className={`${IMAGE_BOX} flex flex-col items-center justify-center gap-2 border-2 border-dashed border-input-border bg-muted p-3 text-center ${radius} ${className}`}
+       >
+         <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-input-border bg-card text-muted-foreground">
+           <ImageOff aria-hidden="true" strokeWidth={2.5} className="h-6 w-6" />
+@@ -43,7 +43,7 @@ export function ProductImageFrame({
+ 
+   const tint = COLOR_CLASSES[CATEGORY_META[category].color].tint;
+   return (
+-    <div className={`tint-dots aspect-square w-full overflow-hidden border-2 border-foreground ${tint} ${radius} ${className}`}>
++    <div className={`${IMAGE_BOX} tint-dots overflow-hidden border-2 border-foreground ${tint} ${radius} ${className}`}>
+       <Image
+         src={image.url}
+         alt={name}
+diff --git a/src/components/site-header.tsx b/src/components/site-header.tsx
+index 8cef7c3..b6b4e9a 100644
+--- a/src/components/site-header.tsx
++++ b/src/components/site-header.tsx
+@@ -1,17 +1,20 @@
+ import { ArrowRight } from "lucide-react";
+ import Link from "next/link";
++import { Suspense } from "react";
+ 
+ import { MemberPricingBadge } from "@/components/badge";
+ import { Logo } from "@/components/logo";
+-import { BUTTON_PRIMARY, BUTTON_SECONDARY, CONTAINER, TEXT_LINK } from "@/components/ui-classes";
++import { HeaderSessionSkeleton } from "@/components/skeletons";
++import { BUTTON_PRIMARY, BUTTON_SECONDARY, CONTAINER, HEADER_SESSION_SLOT, TEXT_LINK } from "@/components/ui-classes";
+ import { logout } from "@/lib/auth/actions";
+ import { verifySession } from "@/lib/dal";
+ 
+ /**
+- * `session`: for routes that export `instant = false` (reads the session through the DAL).
+- * `minimal`: for /login and not-found; never reads the session.
++ * `session`: for / and /products/[slug]. The frame and logo are static; only the session controls
++ * read the session (through the DAL), inside a Suspense boundary with a same-size skeleton (D-031).
++ * `minimal`: for /login and not-found; never reads the session, no boundary.
+  */
+-export async function SiteHeader({ variant }: { variant: "session" | "minimal" }) {
++export function SiteHeader({ variant }: { variant: "session" | "minimal" }) {
+   return (
+     <header className="border-b-2 border-foreground">
+       <div className={`${CONTAINER} flex flex-wrap items-center justify-between gap-3 py-3`}>
+@@ -21,34 +24,45 @@ export async function SiteHeader({ variant }: { variant: "session" | "minimal" }
+             Back to catalog
+           </Link>
+         ) : (
+-          <SessionControls />
++          <Suspense fallback={<HeaderSessionSkeleton />}>
++            <SessionControls />
++          </Suspense>
+         )}
+       </div>
+     </header>
+   );
+ }
+ 
++/**
++ * Both states fill the same fixed-height slot (HEADER_SESSION_SLOT) as the skeleton. Logged in,
++ * the badge sits above the name below `md` (one 48 px row with Sign out) and the name is
++ * truncated, so a long name never adds a line.
++ */
+ async function SessionControls() {
+   const session = await verifySession();
+ 
+   if (!session) {
+     return (
+-      <Link href="/login" className={BUTTON_PRIMARY}>
+-        Sign in
+-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-card text-accent-strong">
+-          <ArrowRight aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
+-        </span>
+-      </Link>
++      <div className={`${HEADER_SESSION_SLOT} justify-end`}>
++        <Link href="/login" className={BUTTON_PRIMARY}>
++          Sign in
++          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-card text-accent-strong">
++            <ArrowRight aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
++          </span>
++        </Link>
++      </div>
+     );
+   }
+ 
+   return (
+-    <div className="flex flex-wrap items-center gap-3">
+-      <MemberPricingBadge />
+-      <p className="text-sm">
+-        Signed in as <strong className="font-bold">{session.name}</strong>
+-      </p>
+-      <form action={logout}>
++    <div className={HEADER_SESSION_SLOT}>
++      <div className="flex min-w-0 flex-1 flex-col items-start md:flex-row md:items-center md:gap-3">
++        <MemberPricingBadge />
++        <p className="max-w-full truncate text-sm md:max-w-56">
++          Signed in as <strong className="font-bold">{session.name}</strong>
++        </p>
++      </div>
++      <form action={logout} className="shrink-0">
+         <button type="submit" className={BUTTON_SECONDARY}>
+           Sign out
+         </button>
+diff --git a/src/components/skeletons.tsx b/src/components/skeletons.tsx
+new file mode 100644
+index 0000000..e3b8e4c
+--- /dev/null
++++ b/src/components/skeletons.tsx
+@@ -0,0 +1,269 @@
++// Suspense fallbacks for the parts of a page that read request data (D-031, docs/design.md
++// Skeleton). Server components, no props, no text: each root has `aria-busy="true"` and a
++// `data-skeleton` marker, every element inside is `aria-hidden="true"`. Every box that decides a
++// size (frames, rows, gaps, paddings, control heights, line heights) uses the same class constant
++// from ui-classes.ts as the component it stands in for, so swapping it for the real content
++// shifts nothing.
++import {
++  BANNER_FRAME,
++  BANNER_INNER,
++  BREADCRUMB_TEXT,
++  CARD_META_TEXT,
++  CATALOG_STACK,
++  CHIP_ROW,
++  CONTAINER,
++  CONTROL_HEIGHT,
++  COUNT_TEXT,
++  DETAIL_BODY,
++  DETAIL_CATEGORY_ROW,
++  DETAIL_GRID,
++  DETAIL_IMAGE_COLUMN,
++  DETAIL_IMAGE_SIZE,
++  DETAIL_INFO_COLUMN,
++  DETAIL_PRICE_CARD,
++  DETAIL_PRICE_FOOTER,
++  DETAIL_PRICE_FOOTER_STACK,
++  DETAIL_SPECS,
++  DETAIL_TITLE_TEXT,
++  FEATURE_ICON,
++  FEATURE_ITEM,
++  FEATURE_LIST,
++  FILTER_CARD_FRAME,
++  FILTER_FOOTER_ROW,
++  FILTER_LAYOUT_COLUMN,
++  FILTER_SEARCH_COLUMN,
++  FILTER_SEARCH_ROW,
++  FILTER_TOP_ROW,
++  FORM_FIELD,
++  HEADER_SESSION_SLOT,
++  ICON_CIRCLE,
++  IMAGE_BOX,
++  LABEL,
++  LAYOUT_TRACK,
++  LOGIN_CARD_FRAME,
++  LOGIN_FORM,
++  LOGIN_INTRO,
++  LOGIN_NOTE,
++  LOGIN_TITLE_TEXT,
++  PRICE_AMOUNT_TEXT,
++  PRICE_STACK,
++  PRODUCT_CARD_BODY,
++  PRODUCT_CARD_FRAME,
++  PRODUCT_CARD_ICON,
++  PRODUCT_CARD_IMAGE_BOX,
++  PRODUCT_GRID_COLUMNS,
++  PRODUCT_NAME_TEXT,
++  SEARCH_INPUT_SIZE,
++  SECTION_HEADING,
++} from "@/components/ui-classes";
++
++/** A pulsing muted fill (pulse in globals.css, off under prefers-reduced-motion). */
++const FILL = "skeleton-pulse block bg-muted";
++/** Stand-in for text, prices, images and inputs. */
++const BLOCK = `${FILL} rounded-md`;
++/** Stand-in for pills (buttons, chips, the layout options, icon circles). */
++const PILL = `${FILL} rounded-full`;
++
++/**
++ * One line of text. The wrapper takes the typography classes of the text it stands in for and is
++ * exactly one line box tall (`1lh`), so it has the text's height; the bar inside is thinner.
++ */
++function Line({ text, className = "" }: { text: string; className?: string }) {
++  return (
++    <span aria-hidden="true" className={`flex h-lh items-center ${text} ${className}`}>
++      <span aria-hidden="true" className={`${BLOCK} h-[0.75em] w-full`} />
++    </span>
++  );
++}
++
++/** Two-line price block (label over amount), as in Price. */
++function PriceSkeleton() {
++  return (
++    <div aria-hidden="true" className={PRICE_STACK}>
++      <Line text={LABEL} className="w-28" />
++      <Line text={PRICE_AMOUNT_TEXT} className="w-24" />
++    </div>
++  );
++}
++
++/** Session controls in the header (Sign in button, or badge + name + Sign out). */
++export function HeaderSessionSkeleton() {
++  return (
++    <div data-skeleton="header-session" aria-busy="true" className={`${HEADER_SESSION_SLOT} justify-end`}>
++      <span aria-hidden="true" className={`${PILL} h-12 w-36`} />
++    </div>
++  );
++}
++
++/** Banner strip under the header (one sentence; logged-in copy has a count). */
++export function BannerSkeleton() {
++  return (
++    <div data-skeleton="banner" aria-busy="true" className={BANNER_FRAME}>
++      <div aria-hidden="true" className={`${CONTAINER} ${BANNER_INNER} flex flex-col`}>
++        <Line text="text-sm" className="w-full max-w-xl" />
++        <Line text="text-sm" className="w-2/3 sm:hidden" />
++      </div>
++    </div>
++  );
++}
++
++// Category chip widths (All + the six categories, in order). Equal to the real chips, so the
++// placeholder chips wrap onto the same number of rows at every width.
++const CHIP_WIDTHS = ["w-[53px]", "w-[179px]", "w-[92.4px]", "w-[182.9px]", "w-[87.7px]", "w-[180.7px]", "w-[107.7px]"];
++
++/** Price-first product card (image, icon circle, price, name, category, age · material). */
++function CardSkeleton() {
++  return (
++    <div aria-hidden="true" className={`${PRODUCT_CARD_FRAME} sticker`}>
++      <div aria-hidden="true" className={PRODUCT_CARD_IMAGE_BOX}>
++        <span aria-hidden="true" className={`${BLOCK} ${IMAGE_BOX}`} />
++      </div>
++      <div aria-hidden="true" className={PRODUCT_CARD_BODY}>
++        <span aria-hidden="true" className={`${PILL} ${PRODUCT_CARD_ICON}`} />
++        <PriceSkeleton />
++        <Line text={PRODUCT_NAME_TEXT} className="w-3/4" />
++        <Line text={CARD_META_TEXT} className="w-1/2" />
++        {/* Age · material: wraps to two lines in the 4-column grid for most products (mock data). */}
++        <div aria-hidden="true" className="flex flex-col">
++          <Line text={CARD_META_TEXT} className="w-full" />
++          <Line text={CARD_META_TEXT} className="hidden w-1/3 xl:flex" />
++        </div>
++      </div>
++    </div>
++  );
++}
++
++/** Filter card (search, layout control, chips, count + Clear filters) and the product grid. */
++export function CatalogSkeleton() {
++  return (
++    <div data-skeleton="catalog" aria-busy="true" className={CATALOG_STACK}>
++      <div aria-hidden="true" className={FILTER_CARD_FRAME}>
++        <div aria-hidden="true" className={FILTER_TOP_ROW}>
++          <div aria-hidden="true" className={FILTER_SEARCH_COLUMN}>
++            <Line text={LABEL} className="w-16" />
++            <div aria-hidden="true" className={FILTER_SEARCH_ROW}>
++              <span aria-hidden="true" className={`${BLOCK} ${SEARCH_INPUT_SIZE}`} />
++              <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-full sm:w-32`} />
++            </div>
++          </div>
++          <div aria-hidden="true" className={FILTER_LAYOUT_COLUMN}>
++            <Line text={LABEL} className="w-16" />
++            <div aria-hidden="true" className={`${LAYOUT_TRACK} border-transparent bg-muted`}>
++              <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-28`} />
++              <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-28`} />
++            </div>
++          </div>
++        </div>
++
++        <div aria-hidden="true" className={CHIP_ROW}>
++          {CHIP_WIDTHS.map((width) => (
++            <span key={width} aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} ${width}`} />
++          ))}
++        </div>
++
++        <div aria-hidden="true" className={FILTER_FOOTER_ROW}>
++          <Line text={COUNT_TEXT} className="w-20" />
++          <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-40`} />
++        </div>
++      </div>
++
++      <div aria-hidden="true" className={PRODUCT_GRID_COLUMNS}>
++        {Array.from({ length: 8 }, (_, index) => (
++          <CardSkeleton key={index} />
++        ))}
++      </div>
++    </div>
++  );
++}
++
++/** Product detail body: breadcrumb, image, and the info column (title, price card, details). */
++export function ProductDetailSkeleton() {
++  return (
++    <div data-skeleton="product-detail" aria-busy="true" className={DETAIL_BODY}>
++      <Line text={BREADCRUMB_TEXT} className="w-60 max-w-full" />
++
++      <div aria-hidden="true" className={DETAIL_GRID}>
++        <div aria-hidden="true" className={DETAIL_IMAGE_COLUMN}>
++          <span aria-hidden="true" className={`${BLOCK} ${IMAGE_BOX} ${DETAIL_IMAGE_SIZE}`} />
++        </div>
++
++        <div aria-hidden="true" className={DETAIL_INFO_COLUMN}>
++          <div aria-hidden="true" className={DETAIL_CATEGORY_ROW}>
++            <span aria-hidden="true" className={`${PILL} ${ICON_CIRCLE}`} />
++            <Line text={LABEL} className="w-20" />
++          </div>
++
++          {/* Typical product copy (mock data): a one-line name; a ~130-character description
++              (4 lines below sm, 2 from sm, 3 in the narrower lg column); 4 features. */}
++          <Line text={DETAIL_TITLE_TEXT} className="w-3/4" />
++
++          <div aria-hidden="true" className="flex flex-col">
++            <Line text="text-base" className="w-full" />
++            <Line text="text-base" className="w-full" />
++            <Line text="text-base" className="w-full sm:hidden lg:flex" />
++            <Line text="text-base" className="w-1/3 sm:hidden" />
++          </div>
++
++          <div aria-hidden="true" className={DETAIL_PRICE_CARD}>
++            <PriceSkeleton />
++            <div aria-hidden="true" className={`${DETAIL_PRICE_FOOTER} ${DETAIL_PRICE_FOOTER_STACK}`}>
++              <Line text="text-sm" className="w-56 max-w-full" />
++              <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-56`} />
++            </div>
++          </div>
++
++          <div aria-hidden="true">
++            <Line text={SECTION_HEADING} className="w-24" />
++            <div aria-hidden="true" className={DETAIL_SPECS}>
++              <Line text="text-sm" className="w-20" />
++              <Line text="text-sm" className="ml-auto w-24" />
++              <Line text="text-sm" className="w-16" />
++              <Line text="text-sm" className="ml-auto w-28" />
++            </div>
++          </div>
++
++          <div aria-hidden="true">
++            <Line text={SECTION_HEADING} className="w-48" />
++            <div aria-hidden="true" className={FEATURE_LIST}>
++              {["w-56", "w-48", "w-52", "w-40"].map((width) => (
++                <div key={width} aria-hidden="true" className={FEATURE_ITEM}>
++                  <span aria-hidden="true" className={`${PILL} ${FEATURE_ICON}`} />
++                  <Line text="text-sm" className={width} />
++                </div>
++              ))}
++            </div>
++          </div>
++
++          <Line text="text-base" className="w-32" />
++        </div>
++      </div>
++    </div>
++  );
++}
++
++/** Login card (title, two sentences, two labelled inputs, full-width submit button). */
++export function LoginCardSkeleton() {
++  return (
++    <div data-skeleton="login-card" aria-busy="true" className={LOGIN_CARD_FRAME}>
++      <Line text={LOGIN_TITLE_TEXT} className="w-28" />
++      <div aria-hidden="true" className={`${LOGIN_INTRO} flex flex-col`}>
++        <Line text="text-base" className="w-full" />
++        <Line text="text-base" className="w-1/3" />
++      </div>
++      <div aria-hidden="true" className={`${LOGIN_NOTE} flex flex-col`}>
++        <Line text="text-sm" className="w-full" />
++        <Line text="text-sm" className="w-1/3 min-[440px]:hidden" />
++      </div>
++
++      <div aria-hidden="true" className={LOGIN_FORM}>
++        {["username", "password"].map((field) => (
++          <div key={field} aria-hidden="true" className={FORM_FIELD}>
++            <Line text={LABEL} className="w-20" />
++            <span aria-hidden="true" className={`${BLOCK} ${CONTROL_HEIGHT} w-full`} />
++          </div>
++        ))}
++        <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-full`} />
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/ui-classes.ts b/src/components/ui-classes.ts
+index cd78fb5..f99ee7e 100644
+--- a/src/components/ui-classes.ts
++++ b/src/components/ui-classes.ts
+@@ -5,16 +5,154 @@ export const CONTAINER = "mx-auto w-full max-w-6xl px-4 md:px-6";
+ 
+ export const LABEL = "text-label font-bold uppercase tracking-wide";
+ 
+-export const BUTTON_PRIMARY =
+-  "btn-pop inline-flex min-h-12 items-center justify-center gap-2 rounded-full border-2 border-foreground bg-accent-strong px-6 font-bold text-white";
++/** Height of every 48 px control (buttons, chips, inputs, layout options) and its skeleton block. */
++export const CONTROL_HEIGHT = "min-h-12";
+ 
+-export const BUTTON_SECONDARY =
+-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border-2 border-foreground bg-transparent px-6 font-bold text-foreground transition-colors hover:bg-tertiary";
++export const BUTTON_PRIMARY = `btn-pop inline-flex ${CONTROL_HEIGHT} items-center justify-center gap-2 rounded-full border-2 border-foreground bg-accent-strong px-6 font-bold text-white`;
++
++export const BUTTON_SECONDARY = `inline-flex ${CONTROL_HEIGHT} items-center justify-center gap-2 rounded-full border-2 border-foreground bg-transparent px-6 font-bold text-foreground transition-colors hover:bg-tertiary`;
+ 
+ export const TEXT_LINK = "font-bold text-accent-strong underline decoration-2 underline-offset-2";
+ 
+ export const CARD_BASE = "rounded-xl border-2 border-foreground bg-card";
+ 
++// Sizes shared by a component and its Suspense skeleton (src/components/skeletons.tsx), so both
++// have the same outer size at every breakpoint and the swap shifts nothing (D-031). Each
++// constant holds the classes that decide a box's size (display, gaps, padding, borders, min and
++// fixed heights, typography that sets the line height); colours stay in the components.
++
++/**
++ * Session part of the site header: its own full-width row below `md`, one 48 px row beside the
++ * logo from `md`. Fixed height in both session states, so the header never changes height.
++ */
++export const HEADER_SESSION_SLOT = "flex h-12 w-full items-center gap-3 md:w-auto";
++
++export const BANNER_FRAME = "border-b-2 border-border bg-card";
++
++/**
++ * Banner text box. The min heights reserve the most lines either banner sentence needs
++ * (3 lines below 360 px, 2 below `sm`, 1 from `sm`), so both states and the skeleton match.
++ */
++export const BANNER_INNER = "min-h-21 py-3 text-sm font-medium min-[360px]:min-h-16 sm:min-h-11";
++
++// Catalog (src/app/page.tsx, filter-card.tsx, product-grid.tsx, product-card.tsx, price.tsx).
++
++/** The page container's stack: filter card, then grid or empty state (and the catalog skeleton root). */
++export const CATALOG_STACK = "flex flex-col gap-10";
++
++export const FILTER_CARD_FRAME = `${CARD_BASE} sticker flex flex-col gap-5 p-4 md:p-6`;
++
++/** Search form beside the layout control from `md`, stacked below. */
++export const FILTER_TOP_ROW = "flex flex-col gap-5 md:flex-row md:items-end md:justify-between";
++
++export const FILTER_SEARCH_COLUMN = "flex flex-1 flex-col gap-2 md:max-w-xl";
++
++/** Search input and Search button: stacked below `sm`, one row from `sm`. */
++export const FILTER_SEARCH_ROW = "flex flex-col gap-3 sm:flex-row";
++
++export const SEARCH_INPUT_SIZE = `${CONTROL_HEIGHT} flex-1`;
++
++export const FILTER_LAYOUT_COLUMN = "flex flex-col gap-2";
++
++/** Segmented layout control track (2 px border, 4 px padding around two 48 px options). */
++export const LAYOUT_TRACK = "inline-flex w-fit gap-1 rounded-full border-2 p-1";
++
++export const LAYOUT_OPTION = `inline-flex ${CONTROL_HEIGHT} items-center rounded-full border-2 px-4 text-sm font-bold`;
++
++export const CHIP_ROW = "flex flex-wrap gap-2";
++
++export const CATEGORY_CHIP = `inline-flex ${CONTROL_HEIGHT} items-center gap-2 rounded-full border-2 border-foreground px-4 text-sm font-bold`;
++
++/** Count and Clear filters, under a rule. */
++export const FILTER_FOOTER_ROW = "flex flex-wrap items-center justify-between gap-3 border-t-2 border-border pt-4";
++
++export const COUNT_TEXT = "font-heading text-lg font-bold";
++
++export const PRODUCT_GRID_COLUMNS = "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
++
++/** Product card frame (price-first layout; the specs layout adds group-data variants). */
++export const PRODUCT_CARD_FRAME = `${CARD_BASE} relative flex flex-col`;
++
++export const PRODUCT_CARD_IMAGE_BOX = "p-3";
++
++export const PRODUCT_CARD_BODY = "flex flex-1 flex-col gap-2 px-4 pb-4";
++
++/** The category icon circle that overlaps the image by 20 px. */
++export const PRODUCT_CARD_ICON = "-mt-5 h-10 w-10";
++
++export const PRODUCT_NAME_TEXT = "font-heading text-lg leading-snug font-bold";
++
++/** Category line and age · material line under the name. */
++export const CARD_META_TEXT = "text-sm";
++
++/** Square image frame (catalog card and detail page). */
++export const IMAGE_BOX = "aspect-square w-full";
++
++/** Price: label line over the amount line. */
++export const PRICE_STACK = "flex flex-col";
++
++export const PRICE_AMOUNT_TEXT = "font-heading text-2xl font-extrabold tabular-nums";
++
++// Product detail (src/app/products/[slug]/page.tsx).
++
++export const DETAIL_BODY = `${CONTAINER} flex flex-col gap-6 py-8`;
++
++export const BREADCRUMB_TEXT = "text-sm";
++
++export const DETAIL_GRID = "grid gap-8 lg:grid-cols-12";
++
++export const DETAIL_IMAGE_COLUMN = "lg:col-span-7";
++
++export const DETAIL_IMAGE_SIZE = "mx-auto max-w-md";
++
++export const DETAIL_INFO_COLUMN = "flex flex-col gap-4 lg:col-span-5";
++
++/** Category icon circle and label above the title. */
++export const DETAIL_CATEGORY_ROW = "flex items-center gap-2";
++
++export const ICON_CIRCLE = "h-10 w-10";
++
++export const DETAIL_TITLE_TEXT = "font-heading text-title-sm leading-tight font-extrabold md:text-title";
++
++export const DETAIL_PRICE_CARD = `${CARD_BASE} sticker p-4`;
++
++/**
++ * Row under the price: a fixed 80 px content box (one text-sm line, 12 px, a 48 px button) under
++ * a rule. Logged out it holds the sign-in prompt; for members it stays empty with a transparent
++ * rule, so the price card has the same height in both states and in the skeleton.
++ */
++export const DETAIL_PRICE_FOOTER = "mt-3 box-content h-20 border-t-2 pt-3";
++
++/** Logged-out content of DETAIL_PRICE_FOOTER: the text line at the top, the button at the bottom. */
++export const DETAIL_PRICE_FOOTER_STACK = "flex flex-col items-start justify-between border-border";
++
++export const SECTION_HEADING = "mb-2 font-heading text-lg font-bold";
++
++export const DETAIL_SPECS = `${CARD_BASE} grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 p-4 text-sm`;
++
++export const FEATURE_LIST = "flex flex-col gap-2 text-sm";
++
++export const FEATURE_ITEM = "flex items-center gap-2";
++
++export const FEATURE_ICON = "h-6 w-6 shrink-0";
++
++// Login (src/app/login/page.tsx).
++
++export const LOGIN_CARD_FRAME = `${CARD_BASE} sticker-member relative w-full max-w-md p-6 md:p-8`;
++
++export const LOGIN_TITLE_TEXT = "font-heading text-2xl font-extrabold";
++
++export const LOGIN_INTRO = "mt-2";
++
++/** Login demo note: two lines until the card is wide enough for one (440 px viewport). */
++export const LOGIN_NOTE = "mt-1 min-h-10 text-sm text-muted-foreground min-[440px]:min-h-5";
++
++export const LOGIN_FORM = "mt-6 flex flex-col gap-4";
++
++export const FORM_FIELD = "flex flex-col gap-2";
++
++export const INPUT = `${CONTROL_HEIGHT} rounded-lg border-2 border-input-border bg-input px-4 placeholder:text-muted-foreground focus:border-accent focus:shadow-pop-accent`;
++
+ /** Per-colour utilities: fills, dot backdrop tint and the active-chip shadow. */
+ export const COLOR_CLASSES: Record<
+   CategoryColor,
