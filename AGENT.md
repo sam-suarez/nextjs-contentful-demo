@@ -73,7 +73,7 @@ Both are written up in [handoffs/ESCALATIONS.md](handoffs/ESCALATIONS.md).
 
 ### Manual interventions
 
-No application code was edited by hand after the pipeline started. Every commit touching `src/` is an agent phase commit (`Agent:` trailers, D-011). The human interventions were decisions and process changes:
+After the pipeline started, application code changed outside it exactly once: a UI polish commit after the deploy (last row below). Every other commit touching `src/` is an agent phase commit (`Agent:` trailers, D-011). The other human interventions were decisions and process changes:
 
 | When | Intervention |
 |---|---|
@@ -84,13 +84,14 @@ No application code was edited by hand after the pipeline started. Every commit 
 | OI-1, OI-2 | The architecture decisions above (D-031, D-032, D-034), plus accepting phase 07's layout changes |
 | After phase 07 | The token and speed optimisation of the workflow (D-033) |
 | 04-fix2 | Committed the D-034 doc edits myself, after the classifier refused to let the orchestrator commit protected docs it had edited via a shell |
+| After deploy | One UI commit outside the pipeline, in a plain session (`6dc6878`, `Agent: manual`): a one-row mobile header and a "Member price applied" note in the detail price card, replacing two phase 07 layout trade-offs. No test changed; every check still passes (see Trade-offs) |
 
 ## 5. Trade-offs
 
 - **Process over speed.** Ten phases with test-first, review and a human gate is slow for an app this size. It was chosen because the brief grades the pipeline, and because it caught both real bugs before a human did.
-- **Batching human checks.** Running several phases per thread saved time, but it was also where the pipeline ran with its path guard off (threads started from a pasted prompt instead of `/phase`), and where the OI-2 check waited longest. `/phase` is now the only entry point.
+- **Batching human checks.** Running several phases per thread saved time, but it was also where the pipeline ran with its path guard off (threads started from a pasted prompt instead of `/phase`), and where the OI-2 check waited longest. A thread can now only start from `/ship` (section 7), which registers the guard.
 - **No-JS rendering dropped for streamed content (D-031).** Prices are still in the initial HTML response, but a visitor without JavaScript sees the skeleton where streamed content would be. Accepted in exchange for following Next's documented pattern.
-- **Layout shift vs design fidelity.** To keep the skeleton swap shift-free, some components reserve space so both session states are the same size. Phase 07 first did this with an empty row under the member price and a second header row on mobile. After deploying, I replaced both by hand: members now see a "Member price applied" note in that space, and the mobile header is one row with a member initial in place of the badge and name.
+- **Layout shift vs design fidelity.** To keep the skeleton swap shift-free, some components reserve space so both session states are the same size. Phase 07 first did this with an empty row under the member price and a second header row on mobile. After deploying, I replaced both outside the pipeline (`6dc6878`, section 4): members now see a "Member price applied" note in that space, and the mobile header is one row with a member initial in place of the badge and name.
 - **Unknown slugs answer 200 with `noindex`,** not a 404 status, because the not-found branch runs in a streamed segment. The page and the `noindex` are correct; the status code is not.
 - **Credentials pick the data source (D-021).** Zero setup for a fresh clone, at the cost that a deploy missing the Contentful variables silently serves mock data (mitigated by the log line).
 
