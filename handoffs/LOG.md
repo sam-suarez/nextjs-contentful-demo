@@ -71,3 +71,10 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | feature member-savings | A5 r1 | reviewer (docs mode) dispatched | PASS (I1–I9, DG1–DG7); 4 notes (quaternary token use, D-036 citation placement in architecture.md Tests, `ui-classes.ts` path, "Who builds what" not updated) |
 | feature member-savings | A6 | Confirm 2 (docs diff) | approved as is |
 | feature member-savings | A7 | phases 09 (data-auth), 10 (ui) registered; docs commit | status build |
+| 09 | spec | spec written (R1–R8) | qa pre-build next |
+| 09 | qa pre-build r1 | qa dispatched | tests written (savings 20 new, to-catalog-product, dal); flagged unowned `filter.test.ts` fixture → spec amendments A1 (add to qa paths), A2 (finite inputs only) |
+| 09 | qa pre-build r2 | qa dispatched (A1) | `filter.test.ts` fixture updated; 32 expected failures + savings module missing; ready |
+| 09 | human | shared working tree: session nextjs-contentful-demo-51 edited agents/, .claude/ and added a /ship-minor lane citing D-036, then reverted | continue, guard each step (git status before lock, diff, commit) |
+| 09 | build r1 | data-auth dispatched | savings.ts, types.ts, to-catalog-product.ts; all checks pass per builder; no disputes |
+| 09 | post-build r1 | qa-run dispatched | PASS (typecheck, lint, 454 unit, boundary, build, verify-ssr 495); e2e not run (missing from spec Checks) |
+| 09 | review r1 | reviewer dispatched | PASS (R1–R8, G1–G6) → close |

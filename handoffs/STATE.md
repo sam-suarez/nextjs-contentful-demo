@@ -12,7 +12,7 @@ One at a time (D-035). `/ship <feature>` fills this table; `/ship` with no argum
 | Slug / branch | `member-savings` / `feature/member-savings` |
 | Base commit | a92a792 |
 | Status | build <!-- none / interview / docs / build / escalated / pr-open --> |
-| Step | phase 09 step 1 <!-- orchestrator step to resume at, e.g. A3, phase 09 step 4, C3 --> |
+| Step | phase 09 step 10 (human check) <!-- orchestrator step to resume at, e.g. A3, phase 09 step 4, C3 --> |
 | Architect round | 1 |
 
 ## Features
@@ -25,11 +25,11 @@ One at a time (D-035). `/ship <feature>` fills this table; `/ship` with no argum
 
 | Field | Value |
 |---|---|
-| Phase | none: all phases done |
+| Phase | 09 savings percent |
 | Status | done <!-- not started / spec / build / review / done / escalated --> |
-| Build round | n/a |
-| Base commit | 841459a (04-fix2, the last phase) |
-| Next step | none planned. New work starts with `/ship <feature>` (D-035); the next phase number is 09 |
+| Build round | 1 |
+| Base commit | df43efc (D-036 docs commit) |
+| Next step | human check, then phase 10 |
 | Open escalation | none. OI-1 and OI-2 closed (`handoffs/ESCALATIONS.md`) |
 
 ## Phase plan
@@ -48,7 +48,7 @@ Phases 01–08 and the two fix phases were run with `/phase`, one phase per thre
 | 07 suspense skeletons | ui | done (2 rounds used) | `feat(ui): phase 07 - suspense skeletons` (b6b3a9d) |
 | 08 release check | qa only | done (all PASS; no fix phases) | `test(release): phase 08 - release check` (a2da463) |
 | 04-fix2 sign-out full page load (OI-2) | ui, then data-auth (one phase, human override) | done (1 round used; 1 pre-build amendment) | `feat(auth): phase 04-fix2 - sign-out full page load` (841459a) |
-| 09 savings percent (member-savings, D-036) | data-auth | planned | |
+| 09 savings percent (member-savings, D-036) | data-auth | done (1 round used; 1 pre-build amendment) | |
 | 10 savings line (member-savings, D-036) | ui | planned | |
 
 ## Human checks

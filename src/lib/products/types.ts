@@ -25,4 +25,5 @@ export type CatalogProduct = {
   image: ProductImage | null; // null -> card renders the placeholder (P03)
   price: number; // the one price this visitor may see
   priceTier: PriceTier; // "everyday" logged out, "member" logged in
+  savingsPercent: number | null; // D-036: whole percent for member tier with a saving, else null
 };

@@ -6,8 +6,13 @@ import { toCatalogProduct } from "@/lib/products/to-catalog-product";
 import type { CatalogProduct, PriceTier } from "@/lib/products/types";
 import { productCollectionSchema, type ProductEntry } from "@/schemas/product";
 
+// P09 contract field. The intersection keeps pre-build typecheck clean (CatalogProduct lacks it
+// until the build); post-build it is the same type.
+type CatalogProductWithSavings = CatalogProduct & { savingsPercent: number | null };
+
 // Typed through the spec contract, so a missing module is the only pre-build type error.
-const toProduct = (entry: ProductEntry, tier: PriceTier): CatalogProduct => toCatalogProduct(entry, tier);
+const toProduct = (entry: ProductEntry, tier: PriceTier): CatalogProductWithSavings =>
+  toCatalogProduct(entry, tier) as CatalogProductWithSavings;
 
 const entries = productCollectionSchema.parse(mockData).items;
 
@@ -38,6 +43,7 @@ const CATALOG_KEYS = [
   "image",
   "price",
   "priceTier",
+  "savingsPercent", // P09 R3
 ].sort();
 
 describe("products/to-catalog-product", () => {
@@ -79,6 +85,7 @@ describe("products/to-catalog-product", () => {
       },
       price: 28,
       priceTier: "everyday",
+      savingsPercent: null,
     });
   });
 
@@ -190,5 +197,86 @@ describe("products/to-catalog-product", () => {
   it("R8: an https:// URL is unchanged", () => {
     const p = toProduct(bunnyWithImageUrl("https://images.ctfassets.net/a/b/c.svg"), "everyday");
     expect(p.image?.url).toBe("https://images.ctfassets.net/a/b/c.svg");
+  });
+
+  // P09: savingsPercent
+
+  it("P09 R3: the key set is exactly the 12 earlier keys plus savingsPercent, for both tiers", () => {
+    const expectedKeys = [
+      "ageRange", "category", "description", "features", "id", "image", "material", "name",
+      "price", "priceTier", "savingsPercent", "slug", "visibility",
+    ];
+    for (const slug of ["cloud-bunny-plush", "bubble-bath-whale", "heirloom-wooden-xylophone"]) {
+      for (const tier of ["everyday", "member"] as const) {
+        expect(Object.keys(toProduct(entry(slug), tier)).sort(), `${slug} ${tier}`).toStrictEqual(expectedKeys);
+      }
+    }
+  });
+
+  it('P09 R4: tier "member" gives savingsPercent 20 for every mock entry', () => {
+    for (const e of entries) {
+      expect(toProduct(e, "member").savingsPercent, e.fields.slug).toBe(20);
+    }
+  });
+
+  it('P09 R4: tier "everyday" gives savingsPercent null for every mock entry', () => {
+    for (const e of entries) {
+      expect(toProduct(e, "everyday").savingsPercent, e.fields.slug).toBeNull();
+    }
+  });
+
+  it('P09 R4: tier "member" computes from priceLoggedOut and priceAuthenticated (3 → 1 gives 67)', () => {
+    const e = entry("cloud-bunny-plush");
+    e.fields.priceLoggedOut = 3;
+    e.fields.priceAuthenticated = 1;
+    const p = toProduct(e, "member");
+    expect(p.savingsPercent).toBe(67);
+    expect(p.price).toBe(1);
+  });
+
+  it('P09 R4: tier "member" computes from priceLoggedOut and priceAuthenticated (200 → 130 gives 35)', () => {
+    const e = entry("heirloom-wooden-xylophone");
+    e.fields.priceLoggedOut = 200;
+    e.fields.priceAuthenticated = 130;
+    expect(toProduct(e, "member").savingsPercent).toBe(35);
+  });
+
+  it('P09 R4: tier "member" with equal prices gives savingsPercent null', () => {
+    const e = entry("cloud-bunny-plush");
+    e.fields.priceLoggedOut = 10;
+    e.fields.priceAuthenticated = 10;
+    expect(toProduct(e, "member").savingsPercent).toBeNull();
+  });
+
+  it('P09 R4: tier "member" with a higher member price gives savingsPercent null', () => {
+    const e = entry("cloud-bunny-plush");
+    e.fields.priceLoggedOut = 10;
+    e.fields.priceAuthenticated = 12;
+    expect(toProduct(e, "member").savingsPercent).toBeNull();
+  });
+
+  it('P09 R4: tier "member" with a saving under 0.5% gives savingsPercent null (100 → 99.7)', () => {
+    const e = entry("cloud-bunny-plush");
+    e.fields.priceLoggedOut = 100;
+    e.fields.priceAuthenticated = 99.7;
+    expect(toProduct(e, "member").savingsPercent).toBeNull();
+  });
+
+  it('P09 R4: tier "member" with an everyday price of 0 gives savingsPercent null', () => {
+    const e = entry("cloud-bunny-plush");
+    e.fields.priceLoggedOut = 0;
+    e.fields.priceAuthenticated = 0;
+    expect(toProduct(e, "member").savingsPercent).toBeNull();
+  });
+
+  it('P09 R4: tier "everyday" stays null whatever priceAuthenticated is (1, 0, 130, 1000)', () => {
+    for (const memberPrice of [1, 0, 130, 1000]) {
+      const e = entry("cloud-bunny-plush");
+      e.fields.priceLoggedOut = 200;
+      e.fields.priceAuthenticated = memberPrice;
+      const p = toProduct(e, "everyday");
+      expect(p.savingsPercent, String(memberPrice)).toBeNull();
+      expect(p.price).toBe(200);
+    }
   });
 });
