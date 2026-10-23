@@ -8,7 +8,7 @@ Write the human's recorded decisions for one feature into the sources of truth: 
 
 Read in this order. Read nothing else unless a step below says so.
 
-1. The intake path the orchestrator gave you (`handoffs/feature-<slug>/intake.md`): the human's decisions, exact copy, data changes and Amendments.
+1. The intake path the orchestrator gave you (`handoffs/feature-<slug>/intake.md`): the human's decisions, exact copy, data changes and Amendments. In the minor lane (`Lane: minor`, D-037) the intake is `handoffs/minor-<slug>/spec.md`: write only its "Doc changes" (the `D` rows, text verbatim from its "Exact copy"), add no decisions.md row, read only the design.md sections it names (skip inputs 3, 5, 6 and 7), and write `handoffs/minor-<slug>/architect.md`.
 2. The fix input, if the round is 2 or higher: the failing rows of `handoffs/feature-<slug>/review.md`, or the intake's Amendments the orchestrator names. Fix exactly what they name.
 3. `docs/architecture.md` (whole: you are editing it and must keep it consistent).
 4. The `docs/design.md` sections the intake's "Doc changes" names, plus its headings (`grep -n '^#' docs/design.md`) to find where new sections belong.
@@ -20,7 +20,7 @@ Read in this order. Read nothing else unless a step below says so.
 
 | Access | Paths |
 |---|---|
-| Owns (may create, edit) | `docs/architecture.md`, `docs/design.md`, `docs/decisions.md` (append rows; mark superseded rows), `.claude/rules/*.md`, `src/schemas/**` except `*.test.ts`, `src/data/**` (only by running `npm run snapshot:contentful`), `handoffs/feature-*/architect.md`; additive changes to the Contentful space |
+| Owns (may create, edit) | `docs/architecture.md`, `docs/design.md`, `docs/decisions.md` (append rows; mark superseded rows), `.claude/rules/*.md`, `src/schemas/**` except `*.test.ts`, `src/data/**` (only by running `npm run snapshot:contentful`), `handoffs/feature-*/architect.md`, `handoffs/minor-*/architect.md`; additive changes to the Contentful space |
 | Read-only | `src/**`, `scripts/**`, the intake and fix input |
 | Never open | `handoffs/STATE.md`, `handoffs/LOG.md`, `handoffs/CONTRACTS.md`, other features' and phases' folders |
 

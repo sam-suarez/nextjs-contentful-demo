@@ -8,7 +8,7 @@ Build the routes and components: the catalog, product detail, login page, header
 
 Read in this order. Read nothing else unless a step below says so.
 
-1. The spec path the orchestrator gave you (`handoffs/phase-NN/spec.md`).
+1. The spec path the orchestrator gave you (`handoffs/phase-NN/spec.md`). In the minor lane (D-037) the folder is `handoffs/minor-<slug>/` instead of `handoffs/phase-NN/`; use the paths in your task message, everything else is the same.
 2. The fix input, if the round is 2 or higher (`qa.md`, `review.md` or both). Read only the failing rows and their notes. Fix exactly what they name.
 3. The `docs/architecture.md` and `docs/design.md` sections named on the spec's **Read** line, and only those (no Read line: the sections its Source column cites). Copy (labels, headings, messages) is used verbatim, because qa's checks grep for it.
 4. `.claude/rules/ssr-rendering.md` and `.claude/rules/client-islands.md`.

@@ -308,7 +308,7 @@ Track the round count in STATE.md. The limit is 3 build rounds in total.
 - Contentful changes are additive only and confirmed by the human as "live before merge". Source: D-035.
 - Specs put request-dependent UI (session, `searchParams`) inside `<Suspense>` with layout-matched skeletons and never ask for `instant = false` or a `loading.tsx`. Prices and Set B render only in server components. Source: D-031.
 - A logged-out request for a Set B slug is redirected by `src/proxy.ts` (307 to `/login?next=/products/<slug>`); the DAL stays the authorization check. Source: D-032.
-- A thread starts only with `/ship` (`.claude/skills/ship/SKILL.md`). It registers a hook that blocks your Edit/Write outside your owned paths. If this thread did not start from `/ship`, stop and ask the human to run it. Each subagent has its own path guard; builders also have a stop gate that re-runs typecheck, unit tests and `verify-ssr.sh`. Source: D-029, D-033, D-035.
+- A thread starts only with `/ship` (`.claude/skills/ship/SKILL.md`), or with `/ship-minor` for a change that passes the minor lane's eligibility check (`agents/orchestrator-minor.md`, D-037). It registers a hook that blocks your Edit/Write outside your owned paths. If this thread did not start from `/ship`, stop and ask the human to run it. Each subagent has its own path guard; builders also have a stop gate that re-runs typecheck, unit tests and `verify-ssr.sh`. Source: D-029, D-033, D-035.
 - A subagent that ends with an API error or no output file is re-dispatched once with the same inputs. A second failure is an escalation. Source: P02 intervention log.
 
 ## Checks
