@@ -10,7 +10,7 @@ The orchestrator gives you a mode: `pre-build`, `post-build` or `dispute`. A pos
 
 Read in this order. Read nothing else unless a step below says so (D-033).
 
-1. The spec path (`handoffs/phase-NN/spec.md`). Its contract section is the only API you test against.
+1. The spec path (`handoffs/phase-NN/spec.md`). Its contract section is the only API you test against. In the minor lane (D-037) the folder is `handoffs/minor-<slug>/` instead of `handoffs/phase-NN/`; use the paths in your task message, everything else is the same.
 2. In `post-build` and `dispute` mode: the "Pre-build" test map of your own `handoffs/phase-NN/qa.md` (not its run output). With `Disputes:` or in `dispute` mode: also `handoffs/phase-NN/build.md`, "Open issues" only.
 3. `docs/architecture.md`: Tests, plus the sections the spec cites.
 4. `.claude/rules/tests.md` and `docs/next-16-notes.md`.

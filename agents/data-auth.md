@@ -8,7 +8,7 @@ Build the server-only layer: session, login/logout server actions, the optimisti
 
 Read in this order. Read nothing else unless a step below says so.
 
-1. The spec path the orchestrator gave you (`handoffs/phase-NN/spec.md`).
+1. The spec path the orchestrator gave you (`handoffs/phase-NN/spec.md`). In the minor lane (D-037) the folder is `handoffs/minor-<slug>/` instead of `handoffs/phase-NN/`; use the paths in your task message, everything else is the same.
 2. The fix input, if the round is 2 or higher (`qa.md`, `review.md` or both). Read only the failing rows and their notes. Fix exactly what they name.
 3. `docs/architecture.md`: the sections named on the spec's **Read** line (default: Data access, Auth, Server/client boundary).
 4. `.claude/rules/server-lib.md`.

@@ -68,6 +68,14 @@ In Claude Code at the repo root, with `gh` logged in:
 
 The orchestrator asks you the architecture and design questions the feature raises, the architect agent writes your answers into the docs, and the build phases run test-first with a check from you after each one. It ends by opening a pull request for you to merge. Run `/ship` with no argument to resume. Details: [AGENT.md](AGENT.md) section 7.
 
+For a small change (a fix, a copy or style tweak, one existing component, no architecture decision), use the fast lane:
+
+```
+/ship-minor make the empty-state heading friendlier
+```
+
+It checks that the change qualifies, asks you to confirm a short spec, has the owning agent build it, reviews it once and opens a pull request. Anything bigger is sent back to `/ship`. Details: [AGENT.md](AGENT.md) section 8.
+
 ## Deploy
 
 Deployed on Vercel: https://nextjs-contentful-demo.vercel.app. To deploy your own copy, import the repository, set `SESSION_SECRET` (and the `CONTENTFUL_*` variables for live content), and deploy with the default Next.js settings.

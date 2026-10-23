@@ -10,7 +10,7 @@ In **docs mode** (D-035) you judge the architect's edits to the source-of-truth 
 
 Phase mode. Read these and nothing else:
 
-1. The spec path (`handoffs/phase-NN/spec.md`).
+1. The spec path (`handoffs/phase-NN/spec.md`). In the minor lane (D-037) the folder is `handoffs/minor-<slug>/` instead of `handoffs/phase-NN/`; use the paths in your task message, everything else is the same. A minor spec's `D` rows are doc changes: judge them against the current `docs/design.md`.
 2. The diff path (`handoffs/phase-NN/diff.patch`).
 3. The `docs/architecture.md` and `docs/design.md` sections named on the spec's **Read** line (no Read line: the sections its Source column cites).
 4. `.claude/rules/*.md`.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // PreToolUse guard: turns each role's Paths table (agents/<role>.md) into a hard limit.
 // Usage: node guard-paths.mjs              (.claude/settings.json: role = the subagent's agent_type)
-//        node guard-paths.mjs orchestrator (.claude/skills/ship/SKILL.md: main-session calls only)
+//        node guard-paths.mjs orchestrator (.claude/skills/ship{,-minor}/SKILL.md: main-session calls only)
 // Writes outside the role's owned paths and reads of its "never open" files are denied (exit 2).
 // Bash writes are not covered: the reviewer's G1 check on the diff is the backstop.
 import { readFileSync } from "node:fs";
@@ -13,8 +13,14 @@ const STATE = "handoffs/STATE.md";
 const ORCH_ONLY = [STATE, "handoffs/LOG.md", "handoffs/CONTRACTS.md"];
 
 const QA = {
-  write: [...QA_OWNED, "handoffs/phase-*/qa.md"],
-  noRead: [...ORCH_ONLY, "handoffs/phase-*/review.md", "handoffs/phase-*/diff.patch"],
+  write: [...QA_OWNED, "handoffs/phase-*/qa.md", "handoffs/minor-*/qa.md"],
+  noRead: [
+    ...ORCH_ONLY,
+    "handoffs/phase-*/review.md",
+    "handoffs/phase-*/diff.patch",
+    "handoffs/minor-*/review.md",
+    "handoffs/minor-*/diff.patch",
+  ],
 };
 
 // write: owned globs. noWrite: wins over write. noRead: never open. readOnly: allowlist (reviewer).
@@ -23,12 +29,12 @@ const ROLES = {
     write: ["handoffs/**", "docs/intervention-log.md", "docs/next-16-notes.md"],
   },
   "data-auth": {
-    write: ["src/lib/**", "src/proxy.ts", ".env.example", "handoffs/phase-*/build.md"],
+    write: ["src/lib/**", "src/proxy.ts", ".env.example", "handoffs/phase-*/build.md", "handoffs/minor-*/build.md"],
     noWrite: QA_OWNED,
     noRead: ORCH_ONLY,
   },
   ui: {
-    write: ["src/app/**", "src/components/**", "next.config.ts", "handoffs/phase-*/build.md"],
+    write: ["src/app/**", "src/components/**", "next.config.ts", "handoffs/phase-*/build.md", "handoffs/minor-*/build.md"],
     noWrite: QA_OWNED,
     noRead: ORCH_ONLY,
   },
@@ -42,6 +48,7 @@ const ROLES = {
       "src/schemas/**",
       "src/data/**",
       "handoffs/feature-*/architect.md",
+      "handoffs/minor-*/architect.md", // D-037 minor lane
     ],
     noWrite: QA_OWNED,
     noRead: ORCH_ONLY,
@@ -54,6 +61,9 @@ const ROLES = {
       "agents/reviewer.md",
       "handoffs/phase-*/spec.md",
       "handoffs/phase-*/diff.patch",
+      // D-037 minor lane: same two inputs, in the change's own folder.
+      "handoffs/minor-*/spec.md",
+      "handoffs/minor-*/diff.patch",
       // D-035 docs mode: the human's decisions and the architect's diff (never architect.md).
       "handoffs/feature-*/intake.md",
       "handoffs/feature-*/docs.patch",

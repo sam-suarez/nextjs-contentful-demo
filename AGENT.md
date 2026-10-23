@@ -119,3 +119,18 @@ After the pipeline started, application code changed outside it exactly once: a 
 5. **Pull request.** The feature ends on its own branch, pushed with a PR that the human merges. The next `/ship` asks GitHub whether it was merged, so nothing has to react to the merge, and only merged docs ever reach `main`, where every new feature starts.
 
 The orchestrator still never decides architecture: the human decides, the architect writes it down, the reviewer checks the writing. One feature is in flight at a time. Contentful has no branches and the deployed site reads the same space, so the architect may only make additive changes there, each confirmed by the human as "live before merge".
+
+## 8. Small changes: `/ship-minor` (D-037)
+
+`/ship` is built for features that raise architecture questions. For a fix, a copy or style tweak, or a change to one existing component, it is mostly overhead. The fast lane keeps what is cheap and drops what only pays off when there is a decision to make:
+
+```
+/ship-minor make the empty-state heading friendlier
+```
+
+1. **Eligibility.** The orchestrator checks the change against a short list: one builder's paths, no architecture change, no data or Contentful change, `design.md` touched only for copy or an existing component's look. If anything fails, it recommends `/ship` instead of stretching the lane.
+2. **One spec, one confirmation.** A short spec (requirements, exact copy, files) and one question to the human. No interview, no phase plan.
+3. **Only the agents it needs.** qa writes or updates tests first only when the change needs a test or an existing assertion covers it. The architect runs only to record a `design.md` copy change. When both run, they run in parallel. Tests are locked before the build either way.
+4. **Same builder, same gates.** The owning builder implements it with its usual stop gate. Then the context-blind reviewer runs in parallel with lint and the client-boundary check. At most two rounds, then the human decides: promote to `/ship`, open a draft PR, or stop.
+5. **Pull request.** The change ends on `minor/<slug>` with a PR the human merges. The lane never touches `STATE.md`, so a minor PR can sit next to an open `/ship` feature.
+
