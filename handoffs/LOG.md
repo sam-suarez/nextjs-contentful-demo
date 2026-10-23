@@ -116,3 +116,5 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 12 | lock check r1 | shasum + list | unchanged |
 | 12 | post-build r1 (dispute) | qa dispatched | dispute: test changed (Ctrl+click expects contextmenu on darwin, click elsewhere; assertions unchanged); all 7 checks PASS (unit 515, verify-ssr 744, e2e 65); only price-sort.spec.ts differs; re-locked; builder not re-dispatched |
 | 12 | review r1 | reviewer dispatched | PASS (R1–R17, G1–G6) → close; 3 layout notes for the human check |
+| 12 | human check | asked with steps in preview | PASSED |
+| feature price-sort | C1–C2 | pr.md written; STATE pr-open | push + gh pr create next |
