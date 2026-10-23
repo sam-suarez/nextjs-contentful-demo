@@ -100,6 +100,13 @@ export const PRICE_STACK = "flex flex-col";
 
 export const PRICE_AMOUNT_TEXT = "font-heading text-2xl font-extrabold tabular-nums";
 
+/**
+ * Savings row under the amount (D-036): one fixed 28 px line, always rendered (empty for the
+ * everyday tier and in skeletons), so every price block has the same height. The savings pill
+ * (12.8 px text, 2 px border, 2 px vertical padding: about 27 px) fits inside it.
+ */
+export const PRICE_SAVINGS_ROW = "flex h-7 items-center";
+
 // Product detail (src/app/products/[slug]/page.tsx).
 
 export const DETAIL_BODY = `${CONTAINER} flex flex-col gap-6 py-8`;

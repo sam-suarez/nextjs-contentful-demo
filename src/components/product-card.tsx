@@ -52,6 +52,7 @@ export function ProductCard({ product, index }: { product: CatalogProduct; index
         <Price
           amount={product.price}
           tier={product.priceTier}
+          savingsPercent={product.savingsPercent}
           className="order-2 group-data-[layout=specs]:order-last group-data-[layout=specs]:mt-1 group-data-[layout=specs]:flex-row group-data-[layout=specs]:items-baseline group-data-[layout=specs]:justify-between group-data-[layout=specs]:border-t-2 group-data-[layout=specs]:border-border group-data-[layout=specs]:pt-2"
         />
 

@@ -1,7 +1,7 @@
 # Phase 09: Human check
 
 **Status:** closed (commit: see `git log -1` on `feature/member-savings`, `feat(data): phase 09 - savings percent`)
-**Result:** <pending>
+**Result:** PASSED (2026-10-22, asked again with the steps in the question preview)
 
 ## Escalation
 

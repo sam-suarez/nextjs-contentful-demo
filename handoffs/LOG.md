@@ -78,3 +78,10 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 09 | build r1 | data-auth dispatched | savings.ts, types.ts, to-catalog-product.ts; all checks pass per builder; no disputes |
 | 09 | post-build r1 | qa-run dispatched | PASS (typecheck, lint, 454 unit, boundary, build, verify-ssr 495); e2e not run (missing from spec Checks) |
 | 09 | review r1 | reviewer dispatched | PASS (R1–R8, G1–G6) → close |
+| 09 | human check | asked (steps in message only) | not answered: human could not see the steps behind the question dialog → proposed /ship improvement logged; re-asked with steps in the preview |
+| 09 | human check | re-asked with steps in preview | PASSED |
+| 10 | spec | spec written (R1–R12; e2e in Checks) | qa pre-build next |
+| 10 | qa pre-build r1 | qa dispatched | format.test.ts (+4), verify-ssr P10 section (8 expected fails), e2e/savings.spec.ts (18 expected fails); existing e2e 25 pass; gap: no price-card DOM hook (finder used) |
+| 10 | build r1 | ui dispatched | all checks pass except e2e savings.spec.ts R4 row-height test (flaky under pop-in animation); disputed |
+| 10 | post-build r1 (dispute) | qa dispatched | dispute: test changed (settleAnimations before measuring R4; assertions unchanged); all 7 checks PASS (unit 458, verify-ssr 514, e2e 43); re-locked; builder not re-dispatched |
+| 10 | review r1 | reviewer dispatched | PASS (R1–R12, G1–G6) → close |

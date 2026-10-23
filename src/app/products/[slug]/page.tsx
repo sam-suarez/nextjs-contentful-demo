@@ -110,7 +110,7 @@ async function ProductDetail({ params }: { params: PageProps<"/products/[slug]">
 
           {/* Same height in both states (DETAIL_PRICE_FOOTER), so the skeleton matches either. */}
           <div className={DETAIL_PRICE_CARD}>
-            <Price amount={product.price} tier={product.priceTier} />
+            <Price amount={product.price} tier={product.priceTier} savingsPercent={product.savingsPercent} />
             {isMember ? (
               <div className={`${DETAIL_PRICE_FOOTER} ${DETAIL_PRICE_FOOTER_MEMBER}`}>
                 <span className={`${ICON_CIRCLE} inline-flex shrink-0 items-center justify-center rounded-full border-2 border-foreground bg-quaternary text-foreground`}>
