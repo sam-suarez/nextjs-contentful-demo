@@ -8,18 +8,19 @@ One at a time (D-035). `/ship <feature>` fills this table; `/ship` with no argum
 
 | Field | Value |
 |---|---|
-| Feature | Member savings line ("You save X%" on member prices) |
-| Slug / branch | `member-savings` / `feature/member-savings` |
-| Base commit | a92a792 |
-| Status | pr-open <!-- none / interview / docs / build / escalated / pr-open --> |
-| Step | C3 <!-- orchestrator step to resume at, e.g. A3, phase 09 step 4, C3 --> |
+| Feature | Price sort (sort the catalog by price, ascending and descending) |
+| Slug / branch | `price-sort` / `feature/price-sort` |
+| Base commit | cbdf068 |
+| Status | build <!-- none / interview / docs / build / escalated / pr-open --> |
+| Step | phase 11 step 1 <!-- orchestrator step to resume at, e.g. A3, phase 09 step 4, C3 --> |
 | Architect round | 1 |
 
 ## Features
 
 | Feature | Decision | Phases | Branch | PR | Status |
 |---|---|---|---|---|---|
-| Member savings line | D-036 | 09, 10 | `feature/member-savings` | (opened at C3) | pr-open |
+| Member savings line | D-036 | 09, 10 | `feature/member-savings` | #1 | merged (c21a177) |
+| Price sort | D-038 | 11, 12 | `feature/price-sort` | | build |
 
 ## Current phase
 
@@ -50,6 +51,8 @@ Phases 01–08 and the two fix phases were run with `/phase`, one phase per thre
 | 04-fix2 sign-out full page load (OI-2) | ui, then data-auth (one phase, human override) | done (1 round used; 1 pre-build amendment) | `feat(auth): phase 04-fix2 - sign-out full page load` (841459a) |
 | 09 savings percent (member-savings, D-036) | data-auth | done (1 round used; 1 pre-build amendment) | `feat(data): phase 09 - savings percent` (bb81078) |
 | 10 savings line (member-savings, D-036) | ui | done (1 round used; 1 dispute, test changed by qa) | `feat(ui): phase 10 - savings line` (457e87f) |
+| 11 price sort helper (price-sort, D-038) | data-auth | planned | |
+| 12 price sort control (price-sort, D-038) | ui | planned | |
 
 ## Human checks
 

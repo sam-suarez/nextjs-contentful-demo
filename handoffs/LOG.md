@@ -87,3 +87,14 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 10 | review r1 | reviewer dispatched | PASS (R1–R12, G1–G6) → close |
 | 10 | human check | asked with steps in preview | PASSED |
 | feature member-savings | C1–C2 | pr.md written; STATE pr-open | push + gh pr create next |
+| feature member-savings | step 0 | gh pr list | PR #1 MERGED (c21a177); recorded, feature cleared |
+| feature price-sort | step 0 | new feature from main (cbdf068) | branch feature/price-sort; status interview, step A1 |
+| feature price-sort | A1 round 1 | asked rendering, options, sort key, control | client reorder (island gets index orders only), price ↑/↓ only (not recommended 3 options), shown price + name ties, segmented control |
+| feature price-sort | A1 round 2 | asked copy, toggle-off, URL state, placement | Price: Low to high / High to low; active click does nothing (not recommended toggle-off); kept by all, cleared by Clear; beside Layout |
+| feature price-sort | A1 round 3 | asked stale server links after client sort | accept like layout (known limitation; not recommended) |
+| feature price-sort | A1 | intake.md written (D-038, phases 11 data-auth, 12 ui) | status docs, step A2 |
+| feature price-sort | A2 | Confirm 1 | approved |
+| feature price-sort | A3 r1 | architect dispatched | docs written (architecture, design, decisions D-038, rules/client-islands.md); checks pass; no data changes |
+| feature price-sort | A5 r1 | reviewer dispatched (docs) | PASS (I1–I9, DG1–DG7); 5 notes, G6 wording vs D-038 |
+| feature price-sort | A6 | Confirm 2 | approved as is (tidy-ups declined) |
+| feature price-sort | A7 | phases 11, 12 registered (STATE, CONTRACTS) | status build; docs commit |
