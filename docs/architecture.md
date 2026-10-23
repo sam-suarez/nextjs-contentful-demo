@@ -30,16 +30,17 @@ src/
 public/products/        product SVGs (source of truth for art)
 ```
 
-## Server/client boundary (D-019, D-022, D-031)
+## Server/client boundary (D-019, D-022, D-031, D-036)
 
 - Prices, Set B products and anything derived from the session render in **server components only**.
+- The member savings line (`You save <n>%`, from `savingsPercent`) is price data: rendered in server components only, never passed to a client island, never in a skeleton (skeletons only reserve its empty row; `docs/design.md`, Price) (D-036).
 - `'use client'` is allowed only under `src/components/client/`. Check: `scripts/check-client-boundary.sh`.
-- Client islands never receive prices, Set B data or session data as props. They receive plain UI state (e.g. the current layout) and server-rendered `children`.
+- Client islands never receive prices (including `savingsPercent`), Set B data or session data as props. They receive plain UI state (e.g. the current layout) and server-rendered `children`.
 - Session-dependent UI, and anything else that reads request data (the session cookie, `searchParams`), sits inside an explicit `<Suspense>` boundary whose fallback is a layout-matched skeleton (`docs/design.md`, Skeleton): the same outer size as the content it replaces, so the swap causes no layout shift. Boundaries wrap the parts that read request data (the session part of the header, the banner, the catalog filter card and grid, the product detail body, the login card), not whole pages through a `loading.tsx`. No route exports `instant = false`: it only switches off a dev-time validation and does not control rendering (D-031).
 - Prices and Set B still reach the browser in the initial HTML response: the streamed content is part of the same response body. Without JavaScript a visitor sees the skeleton in place of streamed content; that is accepted (D-031).
 - The root layout never reads the session. The session-aware site header is rendered by each session route; `/login` and `not-found.tsx` use a header variant that reads no session (`docs/design.md`, Page shell).
 
-## Data access (D-016, D-017, D-020, D-021)
+## Data access (D-016, D-017, D-020, D-021, D-036)
 
 - Every file in `src/lib/**` starts with `import "server-only";`.
 - Only `src/lib/**` may read cookies or call Contentful. Pages and components call DAL functions; they never fetch directly.
@@ -47,6 +48,11 @@ public/products/        product SVGs (source of truth for art)
   - `verifySession()`: reads and verifies the session cookie (jose, HS256, D-012), wrapped in React `cache`. Returns the session or `null`.
   - `getProducts()`: resolves the session, then calls `fetchProducts(sets)` with `["public"]` or `["public", "authenticated"]`.
   - `getProductBySlug(slug)`: same session check. Returns the product, or signals "requires login" / "not found".
+  - Both return each product as a `CatalogProduct` with its price, tier and `savingsPercent: number | null` resolved by the DAL (D-036).
+- `savingsPercent` (D-036):
+  - `Math.round((1 - memberPrice / everydayPrice) * 100)`, a whole number.
+  - `null` when the tier is everyday (every product without a session), when the rounded value is 0 or less (member price not lower), or when the everyday price is 0.
+  - Pages and components only render it; they never compute it and never receive the everyday price for a member-tier product. The logged-out render holds nothing derived from member prices.
 - `fetchProducts(sets)` is **not exported**, uses `'use cache'` + `cacheLife(...)` + `cacheTag("products")`, and is keyed only by `sets` (never by cookie or user data).
 - Source selection: all three `CONTENTFUL_*` vars set (non-empty) means the live adapter; otherwise the mock adapter. An empty string counts as unset. No override. One server log line names the active source. Both adapters apply the same visibility filter.
 - Live adapter: `client.withoutUnresolvableLinks.getEntries({ content_type: "product", "fields.visibility[in]": sets.join(","), order: ["fields.name"] })`. Parse the result with `productCollectionSchema`.
@@ -75,12 +81,12 @@ public/products/        product SVGs (source of truth for art)
 - Empty filter results: an empty state with a Clear Filters link.
 - Unknown slug: `notFound()` with a route-level `not-found.tsx`.
 
-## Tests (D-031, D-032)
+## Tests (D-031, D-032, D-036)
 
 - Unit tests are colocated `*.test.ts` files, run by Vitest in Node. `server-only` is aliased to an empty module in `vitest.config.mts`.
 - Unit tests use the mock data and never touch the network.
 - SSR checks (`scripts/verify-ssr.sh`, Playwright) run without `CONTENTFUL_*` vars so they get deterministic mock data. Because Next loads `.env.local` itself, the checks export the three vars as empty strings (Next never overwrites a var already in the environment) and set their own `SESSION_SECRET`.
-- SSR checks assert both directions on the HTTP response body: Set B names and member prices present with a session, absent without one; everyday prices present without one (D-031). Streamed content counts, because it is in the same response; there are no streaming-wrapper, fallback-text or no-JS assertions.
+- SSR checks assert both directions on the HTTP response body: Set B names, member prices and the savings line `You save 20%` present with a session, absent without one (D-036); everyday prices present without one (D-031). Streamed content counts, because it is in the same response; there are no streaming-wrapper, fallback-text or no-JS assertions.
 - The Set B slug redirect is checked at the HTTP level: a logged-out request gets status 307 with `Location: /login?next=/products/<slug>` (D-032).
 - Sign-out is checked at the HTTP level (`POST /logout` with a session: 303, `Location: /`, the `session` cookie cleared; a foreign `Origin`: 403) and in e2e (after Sign out, with no reload, no Set B name anywhere in the DOM) (D-034).
 - Layout shift: an e2e test measures Cumulative Layout Shift with a `PerformanceObserver` while the skeletons are replaced, and expects it to stay below 0.01 (D-031).
