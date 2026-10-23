@@ -98,3 +98,10 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | feature price-sort | A5 r1 | reviewer dispatched (docs) | PASS (I1–I9, DG1–DG7); 5 notes, G6 wording vs D-038 |
 | feature price-sort | A6 | Confirm 2 | approved as is (tidy-ups declined) |
 | feature price-sort | A7 | phases 11, 12 registered (STATE, CONTRACTS) | status build; docs commit |
+| 11 | spec | spec.md written (R1–R10) | qa pre-build next |
+| 11 | pre-build | qa dispatched | sort.test.ts (38 tests) fails on missing module only; typecheck 1 error (TS2307) |
+| 11 | lock | tests.list + tests.sha written | build round 1 next |
+| 11 | build r1 | data-auth dispatched | sort.ts; all checks pass (unit 496, verify-ssr 514); no open issues |
+| 11 | lock check r1 | shasum + list | unchanged |
+| 11 | review r1 | reviewer dispatched | PASS (R1–R10, G1–G6) |
+| 11 | post-build r1 | qa-run dispatched | PASS (7 checks: unit 496, verify-ssr 514, e2e 43) → close |
