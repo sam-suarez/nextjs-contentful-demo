@@ -4,6 +4,7 @@
 // R11 reorder through React (same DOM nodes, cards stay direct grid children), R14 the
 // contract's orders signed out and in.
 // Written from handoffs/phase-12/spec.md (Requirements + Contract), mock data only.
+// P12-fix1 (pop-in order after a client sort, R1 to R6) is appended at the end of the file.
 import { expect, test, type BrowserContext, type Page, type Request } from "@playwright/test";
 import { SignJWT } from "jose";
 import config from "../playwright.config";
@@ -569,3 +570,348 @@ for (const width of [375, 320]) {
     expect(overflow, "no horizontal scroll").toBeLessThanOrEqual(0);
   });
 }
+
+// =============================================================================================
+// P12-fix1: pop-in order after a client sort.
+// Written from handoffs/phase-12-fix1/spec.md (Requirements + Contract), mock data only.
+// Card hook (Contract): the visible `article` elements in DOM order carry `.pop-in` and the
+// inline `--i`; read through `style.getPropertyValue("--i")`, `getComputedStyle().animationDelay`
+// and `getAnimations()`. A pop-in animation is a CSSAnimation whose name contains `pop-in`
+// (R2 "one `pop-in` animation"; the Contract's example alternate keyframe is `pop-in-replay`).
+// =============================================================================================
+
+type FixAnim = { name: string; startTime: number | null; delay: number; isNew: boolean; playState: string };
+type FixCard = { name: string; i: string; delay: string; anims: FixAnim[] };
+type FixSample = { ok: boolean; t0: number; cards: FixCard[]; violations: string[] };
+
+/**
+ * Call right before a click: remembers every animation that exists now (so a restarted one is
+ * recognisable as a new object) and the document timeline time `t0` of the click.
+ */
+async function armClick(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { __qaT0: number; __qaBefore: WeakSet<Animation> };
+    w.__qaBefore = new WeakSet();
+    for (const a of document.getAnimations()) w.__qaBefore.add(a);
+    w.__qaT0 = Number(document.timeline.currentTime);
+  });
+}
+
+/**
+ * Samples the visible cards every animation frame for up to `ms` after `armClick`.
+ * - `restart` / `stagger`: stops at the first frame that meets R2 / R1 for `expected` and
+ *   returns it; otherwise returns the last frame whose DOM order equals `expected` (or the last).
+ * - `quiet`: samples the whole window and lists every frame's violation of "nothing restarted,
+ *   `--i` unchanged" (R3) or "no animation started" (R5, `expectedI` null).
+ */
+async function sampleCards(
+  page: Page,
+  opts: { mode: "restart" | "stagger" | "quiet"; expected: string[]; expectedI?: string[] | null; ms?: number },
+): Promise<FixSample> {
+  return page.evaluate(async ({ mode, expected, expectedI, ms }) => {
+    const w = window as unknown as { __qaT0: number; __qaBefore: WeakSet<Animation> };
+    const t0 = w.__qaT0;
+    const before = w.__qaBefore;
+    // A composited animation's start time can resolve a fraction of a ms before the click's
+    // timeline time; allow one frame. Identity (`isNew`) is what proves the restart.
+    const FRAME = 20;
+    const delayMs = (v: string) => {
+      const s = v.split(",")[0].trim();
+      return s.endsWith("ms") ? parseFloat(s) : parseFloat(s) * 1000;
+    };
+    const snap = (): FixCard[] =>
+      [...document.querySelectorAll("article")]
+        .filter((a) => a.checkVisibility())
+        .map((a) => ({
+          name: (a.querySelector("h2")?.textContent ?? "").trim(),
+          i: a.style.getPropertyValue("--i").trim(),
+          delay: getComputedStyle(a).animationDelay,
+          anims: a
+            .getAnimations()
+            .filter((x): x is CSSAnimation => x instanceof CSSAnimation)
+            .map((x) => ({
+              name: x.animationName,
+              startTime: x.startTime == null ? null : Number(x.startTime),
+              delay: Number(x.effect?.getTiming().delay ?? 0),
+              isNew: !before.has(x),
+              playState: x.playState,
+            })),
+        }));
+    const sameOrder = (cards: FixCard[]) =>
+      cards.length === expected.length && cards.every((c, k) => c.name === expected[k]);
+    const restarted = (c: FixCard) => {
+      const pops = c.anims.filter((x) => x.name.includes("pop-in"));
+      return pops.length === 1 && pops[0].isNew && pops[0].startTime != null && pops[0].startTime >= t0 - FRAME;
+    };
+    const staggered = (c: FixCard, k: number) =>
+      c.i === String(k) && Math.round(delayMs(c.delay)) === k * 40;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    const end = performance.now() + ms;
+    let lastOrdered: FixCard[] | null = null;
+    let last: FixCard[] = [];
+    const violations: string[] = [];
+    while (performance.now() < end) {
+      await frame();
+      const cards = snap();
+      last = cards;
+      if (mode === "quiet") {
+        const at = Math.round(Number(document.timeline.currentTime) - t0);
+        if (!sameOrder(cards)) violations.push(`+${at}ms order ${cards.map((c) => c.name).join(" | ")}`);
+        cards.forEach((c, k) => {
+          if (expectedI && c.i !== expectedI[k]) violations.push(`+${at}ms ${c.name}: --i ${c.i} (was ${expectedI[k]})`);
+          for (const x of c.anims) {
+            if (x.isNew || x.startTime == null || x.startTime >= t0 - FRAME)
+              violations.push(`+${at}ms ${c.name}: animation ${x.name} started after the click (${x.playState})`);
+          }
+        });
+        continue;
+      }
+      if (!sameOrder(cards)) continue;
+      lastOrdered = cards;
+      const ok = mode === "restart" ? cards.every(restarted) : cards.every(staggered);
+      if (ok) return { ok: true, t0, cards, violations };
+    }
+    return { ok: mode === "quiet" && violations.length === 0, t0, cards: lastOrdered ?? last, violations: [...new Set(violations)].slice(0, 20) };
+  }, { mode: opts.mode, expected: opts.expected, expectedI: opts.expectedI ?? null, ms: opts.ms ?? 2000 });
+}
+
+/** Waits until no visible card has a running or pending CSS animation (the pop-in has played out). */
+async function waitForCardAnimationsToSettle(page: Page) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll("article")]
+            .filter((a) => a.checkVisibility())
+            .flatMap((a) => a.getAnimations())
+            .filter((x) => x instanceof CSSAnimation && (x.playState === "running" || x.pending)).length,
+        ),
+      { timeout: 5000 },
+    )
+    .toBe(0);
+}
+
+async function cardIs(page: Page): Promise<string[]> {
+  return page
+    .locator("article")
+    .filter({ visible: true })
+    .evaluateAll((articles) => articles.map((a) => (a as HTMLElement).style.getPropertyValue("--i").trim()));
+}
+
+const positions = (n: number) => Array.from({ length: n }, (_, k) => String(k));
+const delaysMs = (n: number) => Array.from({ length: n }, (_, k) => k * 40);
+function cardDelayMs(c: FixCard) {
+  const s = c.delay.split(",")[0].trim();
+  return Math.round(s.endsWith("ms") ? parseFloat(s) : parseFloat(s) * 1000);
+}
+
+/** R1 assertions on one sample: contract order, `--i` = DOM position, delay = position x 40 ms. */
+function expectStagger(sample: FixSample, expected: string[]) {
+  expect(sample.cards.map((c) => c.name), "cards in the new order").toEqual(expected);
+  expect(sample.cards.map((c) => c.i), "each card's --i equals its 0-based DOM position").toEqual(
+    positions(expected.length),
+  );
+  expect(sample.cards.map(cardDelayMs), "computed animation-delay is position x 40ms").toEqual(
+    delaysMs(expected.length),
+  );
+}
+
+/** R2 assertions on one sample: one new pop-in per card, started after the click, first-to-last. */
+function expectRestart(sample: FixSample, expected: string[]) {
+  expect(sample.cards.map((c) => c.name), "cards in the new order").toEqual(expected);
+  const summary = sample.cards.map((c) => {
+    const pops = c.anims.filter((x) => x.name.includes("pop-in"));
+    const restarted =
+      pops.length === 1 && pops[0].isNew && pops[0].startTime != null && pops[0].startTime >= sample.t0 - 20;
+    return { name: c.name, popIns: pops.length, restartedAfterClick: restarted };
+  });
+  expect(summary, "every card has exactly one pop-in animation, started after the click").toEqual(
+    expected.map((name) => ({ name, popIns: 1, restartedAfterClick: true })),
+  );
+  const visibleStarts = sample.cards.map((c) => {
+    const p = c.anims.find((x) => x.name.includes("pop-in"));
+    return (p?.startTime ?? NaN) + (p?.delay ?? NaN);
+  });
+  for (let k = 1; k < visibleStarts.length; k++) {
+    expect(visibleStarts[k], `${expected[k]} pops in after ${expected[k - 1]}`).toBeGreaterThan(visibleStarts[k - 1]);
+  }
+}
+
+test("P12-fix1 R1: signed out, Low to high sets each card's --i and animation-delay to its new position", async ({
+  page,
+}) => {
+  await openCatalog(page, "/");
+  await armClick(page);
+  await option(page, ASC).click();
+  const sample = await sampleCards(page, { mode: "stagger", expected: ASC_OUT });
+  expectStagger(sample, ASC_OUT);
+});
+
+test("P12-fix1 R1: High to low after Low to high re-staggers every card by its new position", async ({ page }) => {
+  await openCatalog(page, "/");
+  await option(page, ASC).click();
+  await expectCards(page, ASC_OUT);
+  await armClick(page);
+  await option(page, DESC).click();
+  const sample = await sampleCards(page, { mode: "stagger", expected: DESC_OUT });
+  expectStagger(sample, DESC_OUT);
+});
+
+test("P12-fix1 R1: signed in, Low to high staggers all 12 visible cards (Set B included) by position", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  if (!baseURL) throw new Error("baseURL is not configured");
+  await addSessionCookie(context, baseURL);
+  await openCatalog(page, "/");
+  await expect(page.getByText("Member price", { exact: true }).first()).toBeVisible();
+  await armClick(page);
+  await option(page, ASC).click();
+  const sample = await sampleCards(page, { mode: "stagger", expected: ASC_IN });
+  expectStagger(sample, ASC_IN);
+});
+
+test("P12-fix1 R2: Low to high restarts the pop-in on every card (moved or not), first-to-last", async ({ page }) => {
+  await openCatalog(page, "/");
+  await waitForCardAnimationsToSettle(page);
+  await armClick(page);
+  await option(page, ASC).click();
+  const sample = await sampleCards(page, { mode: "restart", expected: ASC_OUT });
+  expectRestart(sample, ASC_OUT);
+});
+
+test("P12-fix1 R2: a second sort (High to low after Low to high) restarts the pop-in on every card again", async ({
+  page,
+}) => {
+  await openCatalog(page, "/");
+  await option(page, ASC).click();
+  await expectCards(page, ASC_OUT);
+  await waitForCardAnimationsToSettle(page);
+  await armClick(page);
+  await option(page, DESC).click();
+  const sample = await sampleCards(page, { mode: "restart", expected: DESC_OUT });
+  expectRestart(sample, DESC_OUT);
+});
+
+test("P12-fix1 R3: clicking the active High to low after a client sort restarts nothing and keeps every --i", async ({
+  page,
+}) => {
+  await openCatalog(page, "/");
+  await option(page, DESC).click();
+  await expectCards(page, DESC_OUT);
+  await waitForCardAnimationsToSettle(page);
+  const iBefore = await cardIs(page);
+
+  await armClick(page);
+  await option(page, DESC).click();
+  const sample = await sampleCards(page, { mode: "quiet", expected: DESC_OUT, expectedI: iBefore, ms: 1000 });
+  expect(sample.violations, "no restarted animation, no --i change, no reorder").toEqual([]);
+  expect(await cardIs(page)).toEqual(iBefore);
+});
+
+test("P12-fix1 R3: clicking the server-active Low to high on /?sort=price-asc restarts nothing and keeps --i 0..7", async ({
+  page,
+}) => {
+  await openCatalog(page, "/?sort=price-asc");
+  await expectCards(page, ASC_OUT);
+  await waitForCardAnimationsToSettle(page);
+  expect(await cardIs(page), "server --i is the server position").toEqual(positions(ASC_OUT.length));
+
+  await armClick(page);
+  await option(page, ASC).click();
+  const sample = await sampleCards(page, {
+    mode: "quiet",
+    expected: ASC_OUT,
+    expectedI: positions(ASC_OUT.length),
+    ms: 1000,
+  });
+  expect(sample.violations, "no restarted animation, no --i change, no reorder").toEqual([]);
+});
+
+test("P12-fix1 R4: the server HTML gives each card an inline --i equal to its server-rendered position", async ({
+  request,
+}) => {
+  for (const [path, count] of [
+    ["/", NAME_ORDER_OUT.length],
+    ["/?sort=price-asc", ASC_OUT.length],
+    ["/?sort=price-desc", DESC_OUT.length],
+  ] as const) {
+    const res = await request.get(path);
+    expect(res.status(), `${path} status`).toBe(200);
+    const html = await res.text();
+    const is = [...html.matchAll(/<article\b[^>]*>/g)].map((m) => /--i:\s*(-?\d+)/.exec(m[0])?.[1] ?? "missing");
+    expect(is, `${path}: inline --i of each <article> in HTML order`).toEqual(positions(count));
+  }
+});
+
+test("P12-fix1 R5: with prefers-reduced-motion: reduce no card animation runs on load or on sort clicks", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openCatalog(page, "/");
+  const atLoad = await page.evaluate(() =>
+    [...document.querySelectorAll("article")]
+      .filter((a) => a.checkVisibility())
+      .flatMap((a) => a.getAnimations())
+      .filter((x) => x instanceof CSSAnimation && x.playState !== "idle")
+      .map((x) => (x as CSSAnimation).animationName),
+  );
+  expect(atLoad, "no pop-in on load under reduced motion").toEqual([]);
+
+  await armClick(page);
+  await option(page, ASC).click();
+  const asc = await sampleCards(page, { mode: "quiet", expected: ASC_OUT, expectedI: null, ms: 1000 });
+  // Frames before the reorder lands report an order violation only; keep animation violations.
+  expect(asc.violations.filter((v) => v.includes("animation")), "no animation after Low to high").toEqual([]);
+  await expectCards(page, ASC_OUT);
+
+  await armClick(page);
+  await option(page, DESC).click();
+  const desc = await sampleCards(page, { mode: "quiet", expected: DESC_OUT, expectedI: null, ms: 1000 });
+  expect(desc.violations.filter((v) => v.includes("animation")), "no animation after High to low").toEqual([]);
+  await expectCards(page, DESC_OUT);
+});
+
+test("P12-fix1 R6: Low to high then High to low keeps the same card DOM nodes as direct grid children (no remount)", async ({
+  page,
+}) => {
+  await openCatalog(page, "/");
+  await page.evaluate(() => {
+    const articles = [...document.querySelectorAll("article")].filter((a) => a.checkVisibility());
+    articles.forEach((a, k) => ((a as unknown as { __qaCard: string }).__qaCard = `card-${k}`));
+    const grid = articles[0]?.parentElement;
+    if (grid) (grid as unknown as { __qaGrid: boolean }).__qaGrid = true;
+  });
+  const tags = () =>
+    page.evaluate(() => {
+      const articles = [...document.querySelectorAll("article")].filter((a) => a.checkVisibility());
+      const grid = articles[0]?.parentElement;
+      return {
+        sameGrid: !!grid && (grid as unknown as { __qaGrid?: boolean }).__qaGrid === true,
+        directChildren: articles.every((a) => a.parentElement === grid),
+        children: grid?.children.length ?? 0,
+        tags: articles.map((a) => (a as unknown as { __qaCard?: string }).__qaCard ?? null),
+      };
+    });
+  const ascTags = [7, 6, 3, 0, 2, 4, 1, 5].map((k) => `card-${k}`);
+
+  await option(page, ASC).click();
+  await expectCards(page, ASC_OUT);
+  expect(await tags(), "after Low to high").toEqual({
+    sameGrid: true,
+    directChildren: true,
+    children: ASC_OUT.length,
+    tags: ascTags,
+  });
+
+  await option(page, DESC).click();
+  await expectCards(page, DESC_OUT);
+  expect(await tags(), "after High to low").toEqual({
+    sameGrid: true,
+    directChildren: true,
+    children: DESC_OUT.length,
+    tags: [...ascTags].reverse(),
+  });
+});

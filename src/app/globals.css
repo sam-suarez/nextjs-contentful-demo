@@ -157,6 +157,18 @@
 }
 
 /* No skeleton pulse when the visitor asks for less motion (docs/design.md Motion, Skeleton). */
+/* Copy of the theme's `pop-in`, used only by `.pop-in-replay` (see the motion block below). */
+@keyframes pop-in-replay {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton-pulse {
     animation: none;
@@ -174,6 +186,15 @@
     animation: var(--animate-pop-in);
     animation-fill-mode: both;
     animation-delay: calc(var(--i, 0) * 40ms);
+  }
+
+  /*
+   * After a client price sort (D-038) the sort island flips each card between `pop-in` and this
+   * identical keyframe; the name change restarts the pop-in on every card, staggered by its new
+   * `--i`. Same reduced-motion guard as `.pop-in`.
+   */
+  .pop-in.pop-in-replay {
+    animation-name: pop-in-replay;
   }
 
   .sticker-card:hover {

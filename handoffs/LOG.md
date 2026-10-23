@@ -118,3 +118,11 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 12 | review r1 | reviewer dispatched | PASS (R1–R17, G1–G6) → close; 3 layout notes for the human check |
 | 12 | human check | asked with steps in preview | PASSED |
 | feature price-sort | C1–C2 | pr.md written; STATE pr-open | push + gh pr create next |
+| feature price-sort | PR #3 feedback | human: dev-overlay console error | React DevTools extension (gone without extensions; no repro in clean Chromium); no change |
+| feature price-sort | PR #3 feedback | human: pop-in order wrong after sort click | phase-12-fix1 (ui) opened; spec R1–R6 |
+| 12-fix1 | pre-build | qa dispatched | 10 e2e tests; 5 fail on the bug (R1 --i, R2 partial replay), 5 guards pass |
+| 12-fix1 | lock | tests.list + tests.sha | build round 1 next |
+| 12-fix1 | build r1 | ui dispatched | cloneElement --i by position + alternating pop-in-replay keyframe; all checks pass (e2e 75); no open issues |
+| 12-fix1 | lock check r1 | shasum + list | unchanged |
+| 12-fix1 | post-build r1 | qa-run dispatched | PASS (unit 515, verify-ssr 744, e2e 75) |
+| 12-fix1 | review r1 | reviewer dispatched | R1–R6 PASS; G1 REVISE (orchestrator intervention-log hunk in diff) → diff regenerated, close |
