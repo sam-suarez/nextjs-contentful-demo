@@ -52,7 +52,7 @@ Phases 01–08 and the two fix phases were run with `/phase`, one phase per thre
 | 09 savings percent (member-savings, D-036) | data-auth | done (1 round used; 1 pre-build amendment) | `feat(data): phase 09 - savings percent` (bb81078) |
 | 10 savings line (member-savings, D-036) | ui | done (1 round used; 1 dispute, test changed by qa) | `feat(ui): phase 10 - savings line` (457e87f) |
 | 11 price sort helper (price-sort, D-038) | data-auth | done (1 round used) | `feat(data): phase 11 - price sort helper` (7f83272) |
-| 12-fix1 pop-in order (PR #3 feedback) | ui | done (1 round used; review G1 diff-assembly REVISE resolved by the orchestrator) | `fix(ui): phase 12-fix1 - pop-in order after a client sort` |
+| 12-fix1 pop-in order (PR #3 feedback) | ui | done (1 round used; review G1 diff-assembly REVISE resolved by the orchestrator) | `fix(ui): phase 12-fix1 - pop-in order after a client sort` (99a9ce4) |
 | 12 price sort control (price-sort, D-038) | ui | done (1 round used; 1 pre-build amendment, 1 dispute, test changed by qa) | `feat(ui): phase 12 - price sort control` (461cd9c) |
 
 ## Human checks

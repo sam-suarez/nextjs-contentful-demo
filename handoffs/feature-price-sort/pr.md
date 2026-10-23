@@ -23,6 +23,7 @@ The human's answers from the interview, recorded in `handoffs/feature-price-sort
 |-------|---------|--------|---------------|-------------|
 | 11 price sort helper | data-auth | `7f83272` | PASS (unit 496, verify-ssr 514, e2e 43) | passed |
 | 12 price sort control | ui | `461cd9c` | PASS (unit 515, verify-ssr 744, e2e 65) | passed |
+| 12-fix1 pop-in order after a client sort (review feedback) | ui | `99a9ce4` | PASS (unit 515, verify-ssr 744, e2e 75) | pending |
 
 ### Already live
 
