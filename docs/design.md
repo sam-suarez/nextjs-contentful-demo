@@ -104,10 +104,10 @@ Server components in `src/components/` unless marked as an island.
 | **Image frame** | Square, `object-contain`, on a dot-pattern backdrop tinted with the category colour at low opacity. `next/image` with `unoptimized` (architecture.md Error handling) and the product name as `alt` |
 | **Image placeholder** | Same frame size, dashed 2 px `input-border`, `muted` fill, `ImageOff` icon in a white circle, text "Picture coming soon". Used when `image` is absent |
 | **Banner** | Full-width strip under the header, white, bottom border. One sentence plus an optional text link (copy below). The text box keeps a minimum height so the logged-out and logged-in banners are the same height (three lines below about 360 px; accepted after P07, D-031) |
-| **Segmented control** (layout) | Label "Layout"; pill track in `muted`, two options "Price first" / "Specs first"; the active one is white with a 2 px `foreground` border and `shadow-pop`. Exposes `aria-pressed` (island) or `aria-current` (links) |
+| **Segmented control** (layout, price sort) | Label (uppercase label style) above a pill track in `muted` with two options; the active one is white with a 2 px `foreground` border and `shadow-pop`. Exposes `aria-pressed` (island) or `aria-current` (links). Layout: label "Layout", options "Price first" / "Specs first". Price sort (D-038): label "Price", options "Low to high" (`sort=price-asc`) / "High to low" (`sort=price-desc`); no option is active by default (name order) |
 | **Empty state** | Centred inside a sticker card: a cluster of three confetti shapes, heading "No toys match your search", body (copy below), secondary button "Clear filters" |
 | **Alert** | 2 px `foreground` border, `bg-secondary/20`, `rounded-lg`, `role="alert"` |
-| **Skeleton** | The `<Suspense>` fallback for content that reads request data (architecture.md Server/client boundary, D-031). Same outer size as the component it replaces at every breakpoint (same container, card frame, grid columns, row heights and min heights), so the swap causes no layout shift. Inside: `muted` blocks with `rounded-md` (pills where the real element is a pill) standing in for text, prices, images and buttons. A gentle pulse animation that is switched off under `prefers-reduced-motion: reduce`. The region carries `aria-busy="true"`; the blocks are `aria-hidden="true"` and contain no text, so no "Loading" copy appears. Price blocks in skeletons reserve the same savings row under the amount, sized by the same `ui-classes.ts` constant as Price (D-036). Server component, CSS only. Used for: the session part of the site header (Sign in button vs badge + name + Sign out), the catalog banner, the catalog filter card and grid (including the count; placeholder cards follow the grid's columns), the product detail body, and the login card (it reads `searchParams` and the session) |
+| **Skeleton** | The `<Suspense>` fallback for content that reads request data (architecture.md Server/client boundary, D-031). Same outer size as the component it replaces at every breakpoint (same container, card frame, grid columns, row heights and min heights), so the swap causes no layout shift. Inside: `muted` blocks with `rounded-md` (pills where the real element is a pill) standing in for text, prices, images and buttons. A gentle pulse animation that is switched off under `prefers-reduced-motion: reduce`. The region carries `aria-busy="true"`; the blocks are `aria-hidden="true"` and contain no text, so no "Loading" copy appears. Price blocks in skeletons reserve the same savings row under the amount, sized by the same `ui-classes.ts` constant as Price (D-036). Server component, CSS only. Used for: the session part of the site header (Sign in button vs badge + name + Sign out), the catalog banner, the catalog filter card and grid (including the count and the Price control beside Layout, so CLS stays below 0.01 with the sort control, D-038; placeholder cards follow the grid's columns), the product detail body, and the login card (it reads `searchParams` and the session) |
 
 ## Page shell
 
@@ -122,7 +122,7 @@ Server components in `src/components/` unless marked as an island.
 
 Wireframes show structure only; style comes from the tokens and components above.
 
-### Catalog `/` (P03; layout control upgraded in P05)
+### Catalog `/` (P03; layout control upgraded in P05; price sort control in phase 12)
 
 ```
 [logo] Tiny Confetti                                      ( Sign in -> )
@@ -135,8 +135,8 @@ Toy catalog
 Bright, safe toys for little hands.
 
 +-- filter card (white sticker card, no hover) -----------------------+
-| SEARCH                                              LAYOUT          |
-| [ Search toys by name or feature   ] ( Search )     [Price first|Specs first]
+| SEARCH                                              PRICE                      LAYOUT
+| [ Search toys by name or feature   ] ( Search )     [Low to high|High to low]  [Price first|Specs first]
 | (All) (o Rattles & Teethers) (o Plush) (o Stacking & Sorting)       |
 | (o Bath) (o Activity & Sensory) (o Musical)     8 toys  ( Clear filters )
 +---------------------------------------------------------------------+
@@ -170,7 +170,7 @@ Specs first: 1 col, md 2. Card is horizontal from sm
 +-----------------------------------------------------------+
 ```
 
-- **Products:** one grid, sorted by name. With a session, members-only products are mixed into the same grid and carry the "Members only" badge plus the pink sticker shadow. The visibility rule is unchanged: without a session the page never receives them (D-014, D-017).
+- **Products:** one grid, sorted by name unless a price sort is active; then by the price the visitor sees (everyday signed out, member price signed in, members-only products in the same order), equal prices by name (D-038). With a session, members-only products are mixed into the same grid and carry the "Members only" badge plus the pink sticker shadow. The visibility rule is unchanged: without a session the page never receives them (D-014, D-017).
 - **Card content:**
   - Price first: image, icon circle, price block (label, amount, savings row under the amount), name, category label, then `ageRange · material` on one line.
   - Specs first: image left, then name with badge, category, rows "Age range", "Material" and "Highlight" (`features[0]`, row omitted when there are no features), and the price row last. The savings pill sits on its own line under the amount, right-aligned (D-036).
@@ -256,16 +256,21 @@ Catalog / Plush / Cloud Bunny Plush            (breadcrumb, text links)
 
 Everything works with JavaScript disabled (D-019). Server-rendered links and GET forms carry all state in the URL.
 
-- **Search:** `next/form` with `action="/"`, a `q` text input, a submit button "Search", and hidden inputs for the current `category` and `layout` so searching keeps them.
-- **Category chips:** `<Link>`s to `/?category=<value>` that keep the current `q` and `layout`. "All" drops `category`. The active chip has `aria-current="true"`.
-- **Clear filters:** secondary button, `<Link href="/">`.
+- **Search:** `next/form` with `action="/"`, a `q` text input, a submit button "Search", and hidden inputs for the current `category`, `layout` and `sort` so searching keeps them.
+- **Category chips:** `<Link>`s to `/?category=<value>` that keep the current `q`, `layout` and `sort`. "All" drops `category`. The active chip has `aria-current="true"`.
+- **Clear filters:** secondary button, `<Link href="/">`. It drops every param, `sort` included (the only way back to name order besides editing the URL).
 - **Layout control:**
   - P03: two server `<Link>`s (`?layout=price` / `?layout=specs`, keeping `q` and `category`). Switching navigates, which is acceptable until P05.
   - P05: the client island in `src/components/client/` renders the same two links (so no-JS still works). With JS, it prevents navigation, flips `data-layout` on the grid wrapper, updates the URL with `history.replaceState`, and sets `aria-pressed`. It receives only the current layout and server-rendered `children` (D-019, D-022).
+  - The layout links keep the current `sort` (D-038).
+- **Sort control** (D-038): the Segmented control labelled "Price", options "Low to high" (`?sort=price-asc`) and "High to low" (`?sort=price-desc`), beside Layout in the filter card's right column, to its left from `md` up. No option is active by default.
+  - A client island in `src/components/client/` renders the two options as real links that keep the current `q`, `category` and `layout`, so no-JS still works (the server renders the grid in that order). Without JS the active link has `aria-current`.
+  - With JS, a click prevents navigation, reorders the server-rendered cards in the DOM (focus order follows), updates the URL with `history.replaceState`, makes no request, and sets `aria-pressed` on the active option. It receives only the current sort, the per-option index orders (numbers) and the server-rendered cards as `children`.
+  - Clicking the option that is already active does nothing: the grid stays sorted.
 
 ## Responsive
 
-- Mobile first. Below `md`: stack everything, pop shadows shrink to 2 px, decoration hidden, filter card stacks (search, chips that wrap, then layout control and Clear filters).
+- Mobile first. Below `md`: stack everything, pop shadows shrink to 2 px, decoration hidden, filter card stacks (search, chips that wrap, the Price control, the layout control, then the count and Clear filters; D-038).
 - Tap targets at least 48 px tall (buttons, chips, inputs, segmented control options).
 - No horizontal scrolling at 320 px.
 
@@ -284,3 +289,5 @@ Everything works with JavaScript disabled (D-019). Server-rendered links and GET
 | P03 | Tokens in `globals.css`, fonts, root layout + footer, both header variants (the `minimal` one is used later), banner, title area with decoration, filter card (search, chips, Clear filters, layout links), both card variants, price, image frame, placeholder, empty state, `lucide-react` dependency |
 | P04 | Product detail, login (with error alert), not-found |
 | P05 | Layout control island replacing the P03 links |
+| 11 | No UI: the server-only price sort helper (data-auth) |
+| 12 | Price sort control in the filter card (sort island, links keeping `q` / `category` / `layout`), `sort` kept by the search hidden input, chips and layout links, filter card skeleton reserving the control |

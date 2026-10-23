@@ -1,0 +1,188 @@
+diff --git a/.claude/rules/client-islands.md b/.claude/rules/client-islands.md
+index 81e791e..c468986 100644
+--- a/.claude/rules/client-islands.md
++++ b/.claude/rules/client-islands.md
+@@ -8,6 +8,6 @@ paths:
+ Full context: `docs/architecture.md` (Server/client boundary, Filtering and layout).
+ 
+ - This is the only directory where `'use client'` is allowed.
+-- Props carry UI state only (e.g. current layout, current query string) plus server-rendered `children`. Never pass prices (including `savingsPercent`, D-036), product lists, Set B data or session data as props.
++- Props carry UI state only (e.g. current layout, current query string, current sort with its per-option card index orders as plain numbers, D-038) plus server-rendered `children`. Never pass prices (including `savingsPercent`, D-036), product lists, Set B data or session data as props.
+ - Do not import from `src/lib/**` (it is server-only).
+-- State that affects what the server renders belongs in the URL (`category`, `q`, `layout`), not in client state alone.
++- State that affects what the server renders belongs in the URL (`category`, `q`, `layout`, `sort`), not in client state alone.
+diff --git a/docs/architecture.md b/docs/architecture.md
+index e67f3d5..9cdc9fe 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -6,11 +6,11 @@ Source of truth for how the app is built. Agent definitions in `/agents/` and th
+ 
+ Next.js 16 (App Router, Cache Components + Partial Prefetching on), React 19, TypeScript, Tailwind v4 (CSS-first, no `tailwind.config.js`), Contentful (live) or `src/data/products.mock.json` (mock), zod, jose, Vitest, Playwright.
+ 
+-## Routes (D-017, D-018, D-032, D-034)
++## Routes (D-017, D-018, D-032, D-034, D-038)
+ 
+ | Route | Renders | Auth |
+ |---|---|---|
+-| `/` | Catalog: one grid sorted by name. Set A always; with a session, Set B products are mixed into the same grid with a "Members only" badge. Filters + layout toggle | Public; content depends on session |
++| `/` | Catalog: one grid sorted by name, or by the price the visitor sees when `sort` is set (equal prices by name). Set A always; with a session, Set B products are mixed into the same grid with a "Members only" badge. Filters + layout toggle | Public; content depends on session |
+ | `/products/[slug]` | Product detail | Set B slug without session: `src/proxy.ts` answers 307 to `/login?next=/products/<slug>` before rendering (D-032); the page still asks the DAL. Unknown slug: `notFound()` |
+ | `/login` | Login form: `username` + `password`, any non-empty values are accepted; the password is never stored. Empty input redirects to `/login?error=missing` (keeping `next`) | Logged-in visitors are redirected to `/` |
+ | `/logout` | Route handler, `POST` only (no page): deletes the session cookie and answers 303 with `Location: /`, so the browser does a full page load. Other methods get 405. A request whose `Origin` header is present and differs from the app's origin gets 403 | Any (with or without a session) |
+@@ -30,17 +30,18 @@ src/
+ public/products/        product SVGs (source of truth for art)
+ ```
+ 
+-## Server/client boundary (D-019, D-022, D-031, D-036)
++## Server/client boundary (D-019, D-022, D-031, D-036, D-038)
+ 
+ - Prices, Set B products and anything derived from the session render in **server components only**.
+ - The member savings line (`You save <n>%`, from `savingsPercent`) is price data: rendered in server components only, never passed to a client island, never in a skeleton (skeletons only reserve its empty row; `docs/design.md`, Price) (D-036).
+ - `'use client'` is allowed only under `src/components/client/`. Check: `scripts/check-client-boundary.sh`.
+ - Client islands never receive prices (including `savingsPercent`), Set B data or session data as props. They receive plain UI state (e.g. the current layout) and server-rendered `children`.
++- The sort island receives only the current sort and, for each sort option, the card order as a list of indices into the rendered cards (numbers computed on the server), plus the server-rendered cards as `children`. Never prices, slugs or Set B data (D-038).
+ - Session-dependent UI, and anything else that reads request data (the session cookie, `searchParams`), sits inside an explicit `<Suspense>` boundary whose fallback is a layout-matched skeleton (`docs/design.md`, Skeleton): the same outer size as the content it replaces, so the swap causes no layout shift. Boundaries wrap the parts that read request data (the session part of the header, the banner, the catalog filter card and grid, the product detail body, the login card), not whole pages through a `loading.tsx`. No route exports `instant = false`: it only switches off a dev-time validation and does not control rendering (D-031).
+ - Prices and Set B still reach the browser in the initial HTML response: the streamed content is part of the same response body. Without JavaScript a visitor sees the skeleton in place of streamed content; that is accepted (D-031).
+ - The root layout never reads the session. The session-aware site header is rendered by each session route; `/login` and `not-found.tsx` use a header variant that reads no session (`docs/design.md`, Page shell).
+ 
+-## Data access (D-016, D-017, D-020, D-021, D-036)
++## Data access (D-016, D-017, D-020, D-021, D-036, D-038)
+ 
+ - Every file in `src/lib/**` starts with `import "server-only";`.
+ - Only `src/lib/**` may read cookies or call Contentful. Pages and components call DAL functions; they never fetch directly.
+@@ -53,17 +54,24 @@ public/products/        product SVGs (source of truth for art)
+   - `Math.round((1 - memberPrice / everydayPrice) * 100)`, a whole number.
+   - `null` when the tier is everyday (every product without a session), when the rounded value is 0 or less (member price not lower), or when the everyday price is 0.
+   - Pages and components only render it; they never compute it and never receive the everyday price for a member-tier product. The logged-out render holds nothing derived from member prices.
++- Price sort helper (D-038): a pure, server-only module in `src/lib/products/` (`import "server-only";`).
++  - Sorts `CatalogProduct[]` by the price the visitor sees (the DAL-resolved price: everyday without a session, the member price for the tier with one, members-only products included in the same order), ascending or descending; equal prices fall back to name A–Z. No `sort`: the input order is returned unchanged. The input array is not mutated.
++  - Computes, for a rendered list, the index order for each sort option (the sort island's only data).
++  - The signed-out order uses nothing derived from member prices.
++  - Pages call it; they never compare prices themselves.
+ - `fetchProducts(sets)` is **not exported**, uses `'use cache'` + `cacheLife(...)` + `cacheTag("products")`, and is keyed only by `sets` (never by cookie or user data).
+ - Source selection: all three `CONTENTFUL_*` vars set (non-empty) means the live adapter; otherwise the mock adapter. An empty string counts as unset. No override. One server log line names the active source. Both adapters apply the same visibility filter.
+ - Live adapter: `client.withoutUnresolvableLinks.getEntries({ content_type: "product", "fields.visibility[in]": sets.join(","), order: ["fields.name"] })`. Parse the result with `productCollectionSchema`.
+ - Live image URLs are protocol-relative (`//images.ctfassets.net/...`): prefix `https:`. Mock image URLs are `/products/<file>.svg`.
+ 
+-## Filtering and layout (D-019)
++## Filtering and layout (D-019, D-038)
+ 
+-- State lives in URL search params: `category`, `q`, `layout` (`price` | `specs`).
+-- The page awaits `searchParams`, validates them (unknown category/layout values are ignored), and filters on the server.
+-- Filter controls: search is `next/form` with GET (hidden inputs keep `category` and `layout`); category chips are `<Link>`s that keep `q` and `layout`. Clear Filters: `<Link href="/">`.
+-- Layout toggle: a client island flips `data-layout` on the grid wrapper and keeps the URL in sync. Its options are real links, so it still works without JS. Both card variants are server-rendered; Tailwind `group-data-[layout=specs]:` utilities switch columns, orientation and the visible spec block, and move the single price element with `order-*`. No refetch. Until the island exists (P05), the options are plain server links.
++- State lives in URL search params: `category`, `q`, `layout` (`price` | `specs`), `sort` (`price-asc` | `price-desc`).
++- The page awaits `searchParams`, validates them (unknown category/layout/sort values are ignored; no `sort` means name order), filters on the server, then sorts the filtered list with the price sort helper (Data access).
++- Filter controls: search is `next/form` with GET (hidden inputs keep `category`, `layout` and `sort`); category chips are `<Link>`s that keep `q`, `layout` and `sort`. Clear Filters: `<Link href="/">` (drops `sort` too).
++- Layout toggle: a client island flips `data-layout` on the grid wrapper and keeps the URL in sync. Its options are real links (keeping `q`, `category` and `sort`), so it still works without JS. Both card variants are server-rendered; Tailwind `group-data-[layout=specs]:` utilities switch columns, orientation and the visible spec block, and move the single price element with `order-*`. No refetch. Until the island exists (P05), the options are plain server links.
++- Sort control: two options, price ascending (`price-asc`) and price descending (`price-desc`); none is active by default. A client island in `src/components/client/` renders them as real links (`?sort=price-asc` / `?sort=price-desc`, keeping `q`, `category` and `layout`), so it works without JS and the server-rendered order is already correct. With JS, a click reorders the real DOM children (the server-rendered cards) to that option's index order, so focus order follows, updates the URL with `history.replaceState`, and makes no request. Clicking the active option does nothing; there is no way to toggle a price sort off except Clear Filters (or editing the URL).
++- Known limitation (D-038): a client-side sort or layout toggle rewrites the URL without a server render, so the server-rendered links are not updated. After a client-side sort, a chip click, a search or a layout toggle uses the `sort` value from the last server render; after a client-side layout toggle, a sort click writes the `layout` value from the last server render. Not fixed, for sort or for layout.
+ 
+ ## Auth (D-012, D-017, D-032, D-034)
+ 
+@@ -81,7 +89,7 @@ public/products/        product SVGs (source of truth for art)
+ - Empty filter results: an empty state with a Clear Filters link.
+ - Unknown slug: `notFound()` with a route-level `not-found.tsx`.
+ 
+-## Tests (D-031, D-032, D-036)
++## Tests (D-031, D-032, D-036, D-038)
+ 
+ - Unit tests are colocated `*.test.ts` files, run by Vitest in Node. `server-only` is aliased to an empty module in `vitest.config.mts`.
+ - Unit tests use the mock data and never touch the network.
+@@ -89,4 +97,5 @@ public/products/        product SVGs (source of truth for art)
+ - SSR checks assert both directions on the HTTP response body: Set B names, member prices and the savings line `You save 20%` present with a session, absent without one (D-036); everyday prices present without one (D-031). Streamed content counts, because it is in the same response; there are no streaming-wrapper, fallback-text or no-JS assertions.
+ - The Set B slug redirect is checked at the HTTP level: a logged-out request gets status 307 with `Location: /login?next=/products/<slug>` (D-032).
+ - Sign-out is checked at the HTTP level (`POST /logout` with a session: 303, `Location: /`, the `session` cookie cleared; a foreign `Origin`: 403) and in e2e (after Sign out, with no reload, no Set B name anywhere in the DOM) (D-034).
+-- Layout shift: an e2e test measures Cumulative Layout Shift with a `PerformanceObserver` while the skeletons are replaced, and expects it to stay below 0.01 (D-031).
++- Price sort (D-038): SSR checks that `/?sort=price-asc` and `/?sort=price-desc` render the cards in price order both signed out (everyday prices) and signed in (member prices, Set B included), and that an unknown `sort` renders name order. An e2e check that a sort click reorders the cards with no navigation and updates the URL.
++- Layout shift: an e2e test measures Cumulative Layout Shift with a `PerformanceObserver` while the skeletons are replaced, and expects it to stay below 0.01 (D-031). It also covers a sorted URL (D-038).
+diff --git a/docs/decisions.md b/docs/decisions.md
+index 288a312..f253dbd 100644
+--- a/docs/decisions.md
++++ b/docs/decisions.md
+@@ -39,6 +39,7 @@
+ | D-035 | 6 | Feature entry point and the architect role (human decision, after submission; supersedes D-026's "one phase per thread" and the `/phase` entry point of D-029 and D-033 item 11; closes AGENT.md "two more weeks" item 3) | keep `/phase` and edit the protected docs by hand; `/phase NEW: <feature>` with doc edits drafted in `human-check.md`; `/ship <feature>` with an interview and an architect agent | `/ship <feature>` (`.claude/skills/ship/SKILL.md`) is the only entry point; `/phase` is deleted. (1) The orchestrator interviews the human with AskUserQuestion (recommended option first) until every architecture and design question the feature raises is answered, and records the answers in `handoffs/feature-<slug>/intake.md`; Confirm 1. (2) A new **architect** agent (`agents/architect.md`) writes those answers into `docs/architecture.md`, `docs/design.md`, `docs/decisions.md` and `.claude/rules/*.md`, plus listed schema, regenerated mock and Contentful changes. (3) The reviewer checks the doc diff against the intake in a new docs mode (DG1–DG7); the human approves the diff (Confirm 2); one `docs(arch)` commit. (4) The build phases run as before (spec, test-first, lock, build, verify, review), several per thread, with the human check asked in the thread instead of in the next one. (5) The feature ends on a `feature/<slug>` branch: push and `gh pr create`; the human merges. Merge status is not stored: the next `/ship` looks the PR up with `gh pr list --head` and records it. (6) One feature in flight: no new branch from `main` while a PR is open unless the human builds on top of it. (7) Contentful changes are additive only and confirmed as "live before merge" | `/phase`'s argument was the previous gate's verdict, which made no sense for new work after the plan ended. Every architecture change cost an extra thread because no agent could edit the protected docs (Step A, 04-fix2). A separate architect keeps "the orchestrator never decides architecture": the human decides, the architect writes it down, the reviewer checks the writing, the human approves. Asking GitHub for the merge status means nothing has to react to a merge, and docs only reach `main` (what every new branch starts from) once the human merges. STATE.md is one current-state table, so two open PRs would conflict on it. Contentful has no branches and the deployed site reads the same space; `productEntrySchema` ignores unknown fields, so adding is safe and renaming or deleting is not | 2026-10-21 |
+ | D-036 | 6 | Member savings line (human decision, feature member-savings) | savings pill on the amount row or on its own line under it; a savings teaser for signed-out visitors or none | Signed-in members see `You save <n>%` on every member price (both catalog card variants and the product detail price card). The DAL resolves `savingsPercent: number \| null` on `CatalogProduct` = `Math.round((1 - memberPrice / everydayPrice) * 100)`; `null` for the everyday tier, a rounded value of 0 or less, or an everyday price of 0. Pages and components only render it and never receive the everyday price for a member-tier product. A mint (`quaternary`) Badge-style pill on its own line under the amount, right-aligned in Specs first. Every price block and its skeleton reserves the row at a fixed height (one shared `ui-classes.ts` constant), empty when there is no saving or no session. No signed-out teaser | The request was a "You save X%" line on member prices. The saving is price data, so it stays on the server and the logged-out render holds nothing derived from member prices. Skeletons render before the session is known and CLS must stay below 0.01 (D-031), so the row is reserved in every state | 2026-10-22 |
+ | D-037 | 6 | Fast lane for small changes (human decision, after submission; amends D-035's single entry point and "one feature in flight" for this lane only) | run everything through `/ship`; let the main session edit code directly for small changes; a `/ship-minor` lane that keeps the builder, the test lock and one review | `/ship-minor <change>` (`.claude/skills/ship-minor/SKILL.md`, procedure in `agents/orchestrator-minor.md`). (1) Eligibility gate: one builder's paths, no `docs/architecture.md` change (routes, rendering, boundaries, auth, DAL, dependencies), no schema, mock or Contentful change, `docs/design.md` limited to copy or an existing component's look; anything else goes to `/ship`. (2) One short spec (`handoffs/_templates/minor-spec.md`) and one human confirmation, no interview and no phase plan. (3) qa pre-build only when a requirement needs a test or an existing assertion covers the change; the architect only for `design.md` copy; both in parallel. Tests are locked before every build. (4) The owning builder implements (stop gate unchanged). (5) One reviewer pass in parallel with lint and the client-boundary check, which the orchestrator runs; at most 2 build rounds, then the human picks promote to `/ship`, draft PR, or stop. (6) Ends on `minor/<slug>` with a PR the human merges. The lane writes only `handoffs/minor-<slug>/` and never touches `STATE.md`, `LOG.md` or `CONTRACTS.md`; it starts only from a clean `main` | A full `/ship` costs about ten subagent dispatches and several human gates even for a one-line copy change. The interview, architect-first docs and phase plan only pay off when there is an architecture decision; the eligibility gate guarantees there isn't one. Keeping the builder (not the main session) as the author keeps the path guard, the stop gate and the context-blind review, which are cheap. Not touching pipeline state lets a minor PR exist alongside a `/ship` feature without conflicts on `STATE.md`. Found while drafting: a `/ship` thread and this lane shared one working tree, so the lane refuses a dirty tree or a non-`main` branch instead of switching branches under another session | 2026-10-22 |
++| D-038 | 6 | Price sort on the catalog (human decision, feature price-sort; amends D-019's list of URL params) | Sort run: client reorder with no refetch (only option put to the human). Options: Name + price ascending + price descending (recommended), or the two price options. Clicking the active option: back to name order (recommended), or nothing. Stale server-rendered links after a client-side sort: the island updates the links too (recommended), or accept it like layout | A `sort` URL param (`price-asc` \| `price-desc`; unknown values ignored, absent = name order). The server filters, then sorts by the price the visitor sees (everyday signed out, the DAL-resolved member price signed in, members-only products in the same order), equal prices by name A–Z, through a pure server-only helper in `src/lib/products/`; the signed-out order uses nothing derived from member prices. A client island in `src/components/client/` receives only the current sort and, per option, the card order as indices into the rendered cards (numbers only, no prices, slugs or Set B data) plus the server-rendered cards as `children`; a click reorders the real DOM, updates the URL with `history.replaceState` and makes no request; its options are real links, so it works without JS. Two options, none active by default: the Segmented control labelled "Price" with "Low to high" / "High to low", beside Layout (to its left from `md` up), `aria-pressed` with the island, `aria-current` without. Clicking the active option does nothing; Clear filters is the way back to name order. The search hidden input, category chips and layout links keep `sort`; the sort links keep `q`, `category` and `layout`; Clear filters drops it. The filter card skeleton reserves the control. Known limitation, not fixed for sort or for layout: after a client-side sort, a chip click, a search or a layout toggle uses the `sort` from the last server render, and after a client-side layout toggle a sort click writes the `layout` from the last server render | Prices render only in server components and islands never receive prices, so the server sorts (correct initial HTML and no-JS order) and the island only moves already-rendered cards by index. The human chose two price options with no toggle-off, and accepted the stale-link gap as the layout toggle already has it. The skeleton reserves the control so CLS stays below 0.01 (D-031) | 2026-10-23 |
+ 
+ ## Defaults applied (no real trade-off)
+ - create-next-app@16.4.2 flags: TypeScript, App Router, ESLint (flat config, `eslint-config-next`), Turbopack (Next 16 default), React Compiler off (scaffold default)
+diff --git a/docs/design.md b/docs/design.md
+index 09d4cf5..f085b12 100644
+--- a/docs/design.md
++++ b/docs/design.md
+@@ -104,10 +104,10 @@ Server components in `src/components/` unless marked as an island.
+ | **Image frame** | Square, `object-contain`, on a dot-pattern backdrop tinted with the category colour at low opacity. `next/image` with `unoptimized` (architecture.md Error handling) and the product name as `alt` |
+ | **Image placeholder** | Same frame size, dashed 2 px `input-border`, `muted` fill, `ImageOff` icon in a white circle, text "Picture coming soon". Used when `image` is absent |
+ | **Banner** | Full-width strip under the header, white, bottom border. One sentence plus an optional text link (copy below). The text box keeps a minimum height so the logged-out and logged-in banners are the same height (three lines below about 360 px; accepted after P07, D-031) |
+-| **Segmented control** (layout) | Label "Layout"; pill track in `muted`, two options "Price first" / "Specs first"; the active one is white with a 2 px `foreground` border and `shadow-pop`. Exposes `aria-pressed` (island) or `aria-current` (links) |
++| **Segmented control** (layout, price sort) | Label (uppercase label style) above a pill track in `muted` with two options; the active one is white with a 2 px `foreground` border and `shadow-pop`. Exposes `aria-pressed` (island) or `aria-current` (links). Layout: label "Layout", options "Price first" / "Specs first". Price sort (D-038): label "Price", options "Low to high" (`sort=price-asc`) / "High to low" (`sort=price-desc`); no option is active by default (name order) |
+ | **Empty state** | Centred inside a sticker card: a cluster of three confetti shapes, heading "No toys match your search", body (copy below), secondary button "Clear filters" |
+ | **Alert** | 2 px `foreground` border, `bg-secondary/20`, `rounded-lg`, `role="alert"` |
+-| **Skeleton** | The `<Suspense>` fallback for content that reads request data (architecture.md Server/client boundary, D-031). Same outer size as the component it replaces at every breakpoint (same container, card frame, grid columns, row heights and min heights), so the swap causes no layout shift. Inside: `muted` blocks with `rounded-md` (pills where the real element is a pill) standing in for text, prices, images and buttons. A gentle pulse animation that is switched off under `prefers-reduced-motion: reduce`. The region carries `aria-busy="true"`; the blocks are `aria-hidden="true"` and contain no text, so no "Loading" copy appears. Price blocks in skeletons reserve the same savings row under the amount, sized by the same `ui-classes.ts` constant as Price (D-036). Server component, CSS only. Used for: the session part of the site header (Sign in button vs badge + name + Sign out), the catalog banner, the catalog filter card and grid (including the count; placeholder cards follow the grid's columns), the product detail body, and the login card (it reads `searchParams` and the session) |
++| **Skeleton** | The `<Suspense>` fallback for content that reads request data (architecture.md Server/client boundary, D-031). Same outer size as the component it replaces at every breakpoint (same container, card frame, grid columns, row heights and min heights), so the swap causes no layout shift. Inside: `muted` blocks with `rounded-md` (pills where the real element is a pill) standing in for text, prices, images and buttons. A gentle pulse animation that is switched off under `prefers-reduced-motion: reduce`. The region carries `aria-busy="true"`; the blocks are `aria-hidden="true"` and contain no text, so no "Loading" copy appears. Price blocks in skeletons reserve the same savings row under the amount, sized by the same `ui-classes.ts` constant as Price (D-036). Server component, CSS only. Used for: the session part of the site header (Sign in button vs badge + name + Sign out), the catalog banner, the catalog filter card and grid (including the count and the Price control beside Layout, so CLS stays below 0.01 with the sort control, D-038; placeholder cards follow the grid's columns), the product detail body, and the login card (it reads `searchParams` and the session) |
+ 
+ ## Page shell
+ 
+@@ -122,7 +122,7 @@ Server components in `src/components/` unless marked as an island.
+ 
+ Wireframes show structure only; style comes from the tokens and components above.
+ 
+-### Catalog `/` (P03; layout control upgraded in P05)
++### Catalog `/` (P03; layout control upgraded in P05; price sort control in phase 12)
+ 
+ ```
+ [logo] Tiny Confetti                                      ( Sign in -> )
+@@ -135,8 +135,8 @@ Toy catalog
+ Bright, safe toys for little hands.
+ 
+ +-- filter card (white sticker card, no hover) -----------------------+
+-| SEARCH                                              LAYOUT          |
+-| [ Search toys by name or feature   ] ( Search )     [Price first|Specs first]
++| SEARCH                                              PRICE                      LAYOUT
++| [ Search toys by name or feature   ] ( Search )     [Low to high|High to low]  [Price first|Specs first]
+ | (All) (o Rattles & Teethers) (o Plush) (o Stacking & Sorting)       |
+ | (o Bath) (o Activity & Sensory) (o Musical)     8 toys  ( Clear filters )
+ +---------------------------------------------------------------------+
+@@ -170,7 +170,7 @@ Specs first: 1 col, md 2. Card is horizontal from sm
+ +-----------------------------------------------------------+
+ ```
+ 
+-- **Products:** one grid, sorted by name. With a session, members-only products are mixed into the same grid and carry the "Members only" badge plus the pink sticker shadow. The visibility rule is unchanged: without a session the page never receives them (D-014, D-017).
++- **Products:** one grid, sorted by name unless a price sort is active; then by the price the visitor sees (everyday signed out, member price signed in, members-only products in the same order), equal prices by name (D-038). With a session, members-only products are mixed into the same grid and carry the "Members only" badge plus the pink sticker shadow. The visibility rule is unchanged: without a session the page never receives them (D-014, D-017).
+ - **Card content:**
+   - Price first: image, icon circle, price block (label, amount, savings row under the amount), name, category label, then `ageRange · material` on one line.
+   - Specs first: image left, then name with badge, category, rows "Age range", "Material" and "Highlight" (`features[0]`, row omitted when there are no features), and the price row last. The savings pill sits on its own line under the amount, right-aligned (D-036).
+@@ -256,16 +256,21 @@ Catalog / Plush / Cloud Bunny Plush            (breadcrumb, text links)
+ 
+ Everything works with JavaScript disabled (D-019). Server-rendered links and GET forms carry all state in the URL.
+ 
+-- **Search:** `next/form` with `action="/"`, a `q` text input, a submit button "Search", and hidden inputs for the current `category` and `layout` so searching keeps them.
+-- **Category chips:** `<Link>`s to `/?category=<value>` that keep the current `q` and `layout`. "All" drops `category`. The active chip has `aria-current="true"`.
+-- **Clear filters:** secondary button, `<Link href="/">`.
++- **Search:** `next/form` with `action="/"`, a `q` text input, a submit button "Search", and hidden inputs for the current `category`, `layout` and `sort` so searching keeps them.
++- **Category chips:** `<Link>`s to `/?category=<value>` that keep the current `q`, `layout` and `sort`. "All" drops `category`. The active chip has `aria-current="true"`.
++- **Clear filters:** secondary button, `<Link href="/">`. It drops every param, `sort` included (the only way back to name order besides editing the URL).
+ - **Layout control:**
+   - P03: two server `<Link>`s (`?layout=price` / `?layout=specs`, keeping `q` and `category`). Switching navigates, which is acceptable until P05.
+   - P05: the client island in `src/components/client/` renders the same two links (so no-JS still works). With JS, it prevents navigation, flips `data-layout` on the grid wrapper, updates the URL with `history.replaceState`, and sets `aria-pressed`. It receives only the current layout and server-rendered `children` (D-019, D-022).
++  - The layout links keep the current `sort` (D-038).
++- **Sort control** (D-038): the Segmented control labelled "Price", options "Low to high" (`?sort=price-asc`) and "High to low" (`?sort=price-desc`), beside Layout in the filter card's right column, to its left from `md` up. No option is active by default.
++  - A client island in `src/components/client/` renders the two options as real links that keep the current `q`, `category` and `layout`, so no-JS still works (the server renders the grid in that order). Without JS the active link has `aria-current`.
++  - With JS, a click prevents navigation, reorders the server-rendered cards in the DOM (focus order follows), updates the URL with `history.replaceState`, makes no request, and sets `aria-pressed` on the active option. It receives only the current sort, the per-option index orders (numbers) and the server-rendered cards as `children`.
++  - Clicking the option that is already active does nothing: the grid stays sorted.
+ 
+ ## Responsive
+ 
+-- Mobile first. Below `md`: stack everything, pop shadows shrink to 2 px, decoration hidden, filter card stacks (search, chips that wrap, then layout control and Clear filters).
++- Mobile first. Below `md`: stack everything, pop shadows shrink to 2 px, decoration hidden, filter card stacks (search, chips that wrap, the Price control, the layout control, then the count and Clear filters; D-038).
+ - Tap targets at least 48 px tall (buttons, chips, inputs, segmented control options).
+ - No horizontal scrolling at 320 px.
+ 
+@@ -284,3 +289,5 @@ Everything works with JavaScript disabled (D-019). Server-rendered links and GET
+ | P03 | Tokens in `globals.css`, fonts, root layout + footer, both header variants (the `minimal` one is used later), banner, title area with decoration, filter card (search, chips, Clear filters, layout links), both card variants, price, image frame, placeholder, empty state, `lucide-react` dependency |
+ | P04 | Product detail, login (with error alert), not-found |
+ | P05 | Layout control island replacing the P03 links |
++| 11 | No UI: the server-only price sort helper (data-auth) |
++| 12 | Price sort control in the filter card (sort island, links keeping `q` / `category` / `layout`), `sort` kept by the search hidden input, chips and layout links, filter card skeleton reserving the control |

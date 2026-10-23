@@ -13,6 +13,7 @@ import { TitleArea } from "@/components/title-area";
 import { CATALOG_STACK, CONTAINER } from "@/components/ui-classes";
 import { getProducts, verifySession } from "@/lib/dal";
 import { filterProducts } from "@/lib/products/filter";
+import { priceSortOrders, sortProducts } from "@/lib/products/sort";
 
 // The page shell (header frame, title area, container) is static. The parts that read request
 // data (session, searchParams) stream in behind Suspense with same-size skeletons (D-031); prices
@@ -43,16 +44,23 @@ async function CatalogBanner() {
   return <Banner text={session !== null ? memberBannerText(membersOnlyCount) : LOGGED_OUT_BANNER_TEXT} />;
 }
 
-/** Filter card, count and grid (or empty state): validated searchParams, filtered on the server. */
+/**
+ * Filter card, count and grid (or empty state): validated searchParams, filtered then price-sorted
+ * on the server (D-038). The sort island gets only the per-option index orders of this list.
+ */
 async function Catalog({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   const params = parseCatalogParams(await searchParams);
   const products = await getProducts();
-  const visible = filterProducts(products, { category: params.category, q: params.q });
+  const visible = sortProducts(filterProducts(products, { category: params.category, q: params.q }), params.sort);
 
   return (
     <LayoutProvider layout={params.layout}>
       <FilterCard params={params} count={visible.length} />
-      {visible.length > 0 ? <ProductGrid products={visible} /> : <EmptyState q={params.q} />}
+      {visible.length > 0 ? (
+        <ProductGrid products={visible} sort={params.sort} orders={priceSortOrders(visible)} />
+      ) : (
+        <EmptyState q={params.q} />
+      )}
     </LayoutProvider>
   );
 }

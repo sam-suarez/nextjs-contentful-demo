@@ -87,3 +87,42 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 10 | review r1 | reviewer dispatched | PASS (R1–R12, G1–G6) → close |
 | 10 | human check | asked with steps in preview | PASSED |
 | feature member-savings | C1–C2 | pr.md written; STATE pr-open | push + gh pr create next |
+| feature member-savings | step 0 | gh pr list | PR #1 MERGED (c21a177); recorded, feature cleared |
+| feature price-sort | step 0 | new feature from main (cbdf068) | branch feature/price-sort; status interview, step A1 |
+| feature price-sort | A1 round 1 | asked rendering, options, sort key, control | client reorder (island gets index orders only), price ↑/↓ only (not recommended 3 options), shown price + name ties, segmented control |
+| feature price-sort | A1 round 2 | asked copy, toggle-off, URL state, placement | Price: Low to high / High to low; active click does nothing (not recommended toggle-off); kept by all, cleared by Clear; beside Layout |
+| feature price-sort | A1 round 3 | asked stale server links after client sort | accept like layout (known limitation; not recommended) |
+| feature price-sort | A1 | intake.md written (D-038, phases 11 data-auth, 12 ui) | status docs, step A2 |
+| feature price-sort | A2 | Confirm 1 | approved |
+| feature price-sort | A3 r1 | architect dispatched | docs written (architecture, design, decisions D-038, rules/client-islands.md); checks pass; no data changes |
+| feature price-sort | A5 r1 | reviewer dispatched (docs) | PASS (I1–I9, DG1–DG7); 5 notes, G6 wording vs D-038 |
+| feature price-sort | A6 | Confirm 2 | approved as is (tidy-ups declined) |
+| feature price-sort | A7 | phases 11, 12 registered (STATE, CONTRACTS) | status build; docs commit |
+| 11 | spec | spec.md written (R1–R10) | qa pre-build next |
+| 11 | pre-build | qa dispatched | sort.test.ts (38 tests) fails on missing module only; typecheck 1 error (TS2307) |
+| 11 | lock | tests.list + tests.sha written | build round 1 next |
+| 11 | build r1 | data-auth dispatched | sort.ts; all checks pass (unit 496, verify-ssr 514); no open issues |
+| 11 | lock check r1 | shasum + list | unchanged |
+| 11 | review r1 | reviewer dispatched | PASS (R1–R10, G1–G6) |
+| 11 | post-build r1 | qa-run dispatched | PASS (7 checks: unit 496, verify-ssr 514, e2e 43) → close |
+| 11 | human check | asked with steps in preview | PASSED |
+| 12 | spec | spec.md written (R1–R17) | qa pre-build next |
+| 12 | pre-build | qa dispatched | tests written (unit, verify-ssr P12 section, e2e price-sort + CLS sorted URL); all new fail on missing feature; Open issue: R14 last sentence contradicts D-038 limitation |
+| 12 | escalation | OI-3 opened | asking the human |
+| 12 | OI-3 | human answer | drop R14 last sentence (not recommended: qa version) → amendment A1; qa dispute mode to remove the test |
+| 12 | dispute (A1) | qa dispatched | removed the R14 layout-after-sort test + unused SPECS_FIRST; nothing else |
+| 12 | lock | tests.list + tests.sha written | build round 1 next |
+| 12 | build r1 | ui dispatched | all checks pass except e2e price-sort.spec.ts:384 (Ctrl+click on macOS Chromium fires contextmenu, no click); disputed |
+| 12 | lock check r1 | shasum + list | unchanged |
+| 12 | post-build r1 (dispute) | qa dispatched | dispute: test changed (Ctrl+click expects contextmenu on darwin, click elsewhere; assertions unchanged); all 7 checks PASS (unit 515, verify-ssr 744, e2e 65); only price-sort.spec.ts differs; re-locked; builder not re-dispatched |
+| 12 | review r1 | reviewer dispatched | PASS (R1–R17, G1–G6) → close; 3 layout notes for the human check |
+| 12 | human check | asked with steps in preview | PASSED |
+| feature price-sort | C1–C2 | pr.md written; STATE pr-open | push + gh pr create next |
+| feature price-sort | PR #3 feedback | human: dev-overlay console error | React DevTools extension (gone without extensions; no repro in clean Chromium); no change |
+| feature price-sort | PR #3 feedback | human: pop-in order wrong after sort click | phase-12-fix1 (ui) opened; spec R1–R6 |
+| 12-fix1 | pre-build | qa dispatched | 10 e2e tests; 5 fail on the bug (R1 --i, R2 partial replay), 5 guards pass |
+| 12-fix1 | lock | tests.list + tests.sha | build round 1 next |
+| 12-fix1 | build r1 | ui dispatched | cloneElement --i by position + alternating pop-in-replay keyframe; all checks pass (e2e 75); no open issues |
+| 12-fix1 | lock check r1 | shasum + list | unchanged |
+| 12-fix1 | post-build r1 | qa-run dispatched | PASS (unit 515, verify-ssr 744, e2e 75) |
+| 12-fix1 | review r1 | reviewer dispatched | R1–R6 PASS; G1 REVISE (orchestrator intervention-log hunk in diff) → diff regenerated, close |

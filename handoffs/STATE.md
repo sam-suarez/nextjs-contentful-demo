@@ -8,9 +8,9 @@ One at a time (D-035). `/ship <feature>` fills this table; `/ship` with no argum
 
 | Field | Value |
 |---|---|
-| Feature | Member savings line ("You save X%" on member prices) |
-| Slug / branch | `member-savings` / `feature/member-savings` |
-| Base commit | a92a792 |
+| Feature | Price sort (sort the catalog by price, ascending and descending) |
+| Slug / branch | `price-sort` / `feature/price-sort` |
+| Base commit | cbdf068 |
 | Status | pr-open <!-- none / interview / docs / build / escalated / pr-open --> |
 | Step | C3 <!-- orchestrator step to resume at, e.g. A3, phase 09 step 4, C3 --> |
 | Architect round | 1 |
@@ -19,18 +19,19 @@ One at a time (D-035). `/ship <feature>` fills this table; `/ship` with no argum
 
 | Feature | Decision | Phases | Branch | PR | Status |
 |---|---|---|---|---|---|
-| Member savings line | D-036 | 09, 10 | `feature/member-savings` | (opened at C3) | pr-open |
+| Member savings line | D-036 | 09, 10 | `feature/member-savings` | #1 | merged (c21a177) |
+| Price sort | D-038 | 11, 12 | `feature/price-sort` | #3 | pr-open |
 
 ## Current phase
 
 | Field | Value |
 |---|---|
-| Phase | none: member-savings phases done |
+| Phase | none: price-sort phases and 12-fix1 done |
 | Status | done <!-- not started / spec / build / review / done / escalated --> |
-| Build round | n/a |
-| Base commit | 457e87f (phase 10, the last phase) |
-| Next step | PR review and merge by the human; the next `/ship` records it |
-| Open escalation | none. OI-1 and OI-2 closed (`handoffs/ESCALATIONS.md`) |
+| Build round | 1 |
+| Base commit | d22b224 (PR #3 head) |
+| Next step | PR #3 review and merge by the human; the next `/ship` records it |
+| Open escalation | none. OI-3 resolved by phase 12 amendment A1 |
 
 ## Phase plan
 
@@ -50,6 +51,9 @@ Phases 01–08 and the two fix phases were run with `/phase`, one phase per thre
 | 04-fix2 sign-out full page load (OI-2) | ui, then data-auth (one phase, human override) | done (1 round used; 1 pre-build amendment) | `feat(auth): phase 04-fix2 - sign-out full page load` (841459a) |
 | 09 savings percent (member-savings, D-036) | data-auth | done (1 round used; 1 pre-build amendment) | `feat(data): phase 09 - savings percent` (bb81078) |
 | 10 savings line (member-savings, D-036) | ui | done (1 round used; 1 dispute, test changed by qa) | `feat(ui): phase 10 - savings line` (457e87f) |
+| 11 price sort helper (price-sort, D-038) | data-auth | done (1 round used) | `feat(data): phase 11 - price sort helper` (7f83272) |
+| 12-fix1 pop-in order (PR #3 feedback) | ui | done (1 round used; review G1 diff-assembly REVISE resolved by the orchestrator) | `fix(ui): phase 12-fix1 - pop-in order after a client sort` (99a9ce4) |
+| 12 price sort control (price-sort, D-038) | ui | done (1 round used; 1 pre-build amendment, 1 dispute, test changed by qa) | `feat(ui): phase 12 - price sort control` (461cd9c) |
 
 ## Human checks
 
@@ -69,3 +73,6 @@ Phases 01–08 and the two fix phases were run with `/phase`, one phase per thre
 | 04-fix2 sign-out full page load (841459a) | PASSED (2026-10-21) | see `handoffs/phase-04-fix2/human-check.md` |
 | 09 savings percent (bb81078) | PASSED (2026-10-22) | first ask hid the steps behind the dialog; re-asked with them in the preview (intervention log) |
 | 10 savings line (457e87f) | PASSED (2026-10-22) | steps shown in the question preview |
+| 11 price sort helper (7f83272) | PASSED (2026-10-23) | steps in the question preview |
+| 12-fix1 pop-in order | pending (human asked to push first) | steps in `handoffs/phase-12-fix1/human-check.md` |
+| 12 price sort control (461cd9c) | PASSED (2026-10-23) | steps in the question preview; review layout notes (768–900 px wrap, pill fit, mobile tab order) accepted |
