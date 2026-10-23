@@ -85,3 +85,5 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 10 | build r1 | ui dispatched | all checks pass except e2e savings.spec.ts R4 row-height test (flaky under pop-in animation); disputed |
 | 10 | post-build r1 (dispute) | qa dispatched | dispute: test changed (settleAnimations before measuring R4; assertions unchanged); all 7 checks PASS (unit 458, verify-ssr 514, e2e 43); re-locked; builder not re-dispatched |
 | 10 | review r1 | reviewer dispatched | PASS (R1–R12, G1–G6) → close |
+| 10 | human check | asked with steps in preview | PASSED |
+| feature member-savings | C1–C2 | pr.md written; STATE pr-open | push + gh pr create next |
