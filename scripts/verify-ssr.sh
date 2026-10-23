@@ -6,6 +6,7 @@
 # P07 (D-031): the R18 loop (no streaming wrappers, no fallback / "Loading" text) is removed.
 # Streamed content is part of the response body and counts as present (P07 R11, R12).
 # P04-fix2 additions (D-034): POST /logout route handler (R4-R7) and the sign-out form (R8).
+# P10 additions (D-036): member savings line `You save 20%` (P10 R2, R7, R8).
 #
 # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
 # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
@@ -863,6 +864,45 @@ check "P04-fix2 R8: / with a session contains action=\"/logout\"" has "$P" 'acti
 check "P04-fix2 R8: / with a session has a <form> with action=/logout and method=post" tag_exists "$P" form 'action=/logout' 'method=post'
 P="$(page anon)"
 check "P04-fix2 R8: / without a session has no <form action=\"/logout\">" no_tag "$P" form 'action=/logout'
+
+# =====================================================================
+# P10: member savings line (D-036)
+# =====================================================================
+# Mock data (P09): every member-tier product has savingsPercent 20, every signed-out product
+# null. The RSC payload repeats the string, so these are presence / absence checks, never counts.
+
+# --- R8: signed in, the savings line is in the response body -----------------
+P10_SIGNED_IN=(
+  "member|/"
+  "detail_cbp_member|/products/cloud-bunny-plush"
+  "detail_ffac_member|/products/forest-friends-activity-cube"
+  "specs_member|/?layout=specs"
+)
+for row in "${P10_SIGNED_IN[@]}"; do
+  IFS='|' read -r name path <<<"$row"
+  P="$(page "$name")"
+  check "P10 R8: $path with a session status 200" status_is "$P" 200
+  check "P10 R8: $path with a session contains You save 20%" has "$P" 'You save 20%'
+  # R2: one text node, the element's only content (React would split several nodes with <!-- -->).
+  check "P10 R2: $path with a session has an element whose text is exactly >You save 20%<" has "$P" '>You save 20%<'
+done
+
+# --- R8: signed out (no cookie, or a cookie that is not a valid session), no savings text ---
+P10_SIGNED_OUT=(
+  "anon|/"
+  "specs|/?layout=specs"
+  "detail_cbp_anon|/products/cloud-bunny-plush"
+  "login_anon|/login"
+  "badcookie|/ (invalid session cookie)"
+)
+for row in "${P10_SIGNED_OUT[@]}"; do
+  IFS='|' read -r name label <<<"$row"
+  P="$(page "$name")"
+  check "P10 R8: $label without a session contains no You save" lacks "$P" 'You save'
+done
+# The signed-out pages above really rendered their prices (so the absence is not an empty page).
+check "P10 R8: / without a session still contains the everyday price \$28.00" has "$(page anon)" '$28.00'
+check "P10 R8: /products/cloud-bunny-plush without a session still contains \$28.00" has "$(page detail_cbp_anon)" '$28.00'
 
 # --- Summary ----------------------------------------------------------------
 echo

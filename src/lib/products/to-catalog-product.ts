@@ -1,5 +1,6 @@
 import "server-only";
 
+import { savingsPercent } from "@/lib/products/savings";
 import type { CatalogProduct, PriceTier, ProductImage } from "@/lib/products/types";
 import type { ProductAsset, ProductEntry } from "@/schemas/product";
 
@@ -35,5 +36,7 @@ export function toCatalogProduct(entry: ProductEntry, tier: PriceTier): CatalogP
     image: toImage(f.image),
     price: tier === "member" ? f.priceAuthenticated : f.priceLoggedOut,
     priceTier: tier,
+    // D-036: the only place the percent is computed; everyday tier never reads the member price.
+    savingsPercent: tier === "member" ? savingsPercent(f.priceLoggedOut, f.priceAuthenticated) : null,
   };
 }

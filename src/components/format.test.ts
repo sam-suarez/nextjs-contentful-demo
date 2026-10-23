@@ -3,6 +3,7 @@ import {
   LOGGED_OUT_BANNER_TEXT,
   emptyStateMessage,
   formatPrice,
+  formatSavings,
   formatToyCount,
   memberBannerText,
 } from "@/components/format";
@@ -88,5 +89,22 @@ describe("format", () => {
       expect(text).toContain("You're");
       expect(text).not.toMatch(/[‘’]/);
     }
+  });
+
+  it("P10 R2: formatSavings(20) is exactly You save 20%", () => {
+    expect(formatSavings(20)).toBe("You save 20%");
+  });
+
+  it("P10 R2: formatSavings(5) is exactly You save 5% (no padding)", () => {
+    expect(formatSavings(5)).toBe("You save 5%");
+  });
+
+  it("P10 R2: formatSavings(100) is exactly You save 100%", () => {
+    expect(formatSavings(100)).toBe("You save 100%");
+  });
+
+  it("P10 R2: formatSavings uses plain ASCII spaces and percent sign (one verbatim string)", () => {
+    expect(formatSavings(20)).toMatch(/^You save 20%$/);
+    expect(formatSavings(20)).not.toMatch(/[^\x20-\x7e]/);
   });
 });

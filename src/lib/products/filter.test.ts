@@ -12,7 +12,12 @@ const filter = (products: readonly CatalogProduct[], filters: ProductFilters): C
 
 // CatalogProduct fixtures built here from the mock entries (not through toCatalogProduct),
 // so this file tests filterProducts alone.
-function catalog(e: ProductEntry, tier: "everyday" | "member"): CatalogProduct {
+// P09 (amendment A1): the fixture carries savingsPercent. The intersection keeps pre-build
+// typecheck clean (CatalogProduct lacks the field until the build); post-build it is the same type.
+function catalog(
+  e: ProductEntry,
+  tier: "everyday" | "member",
+): CatalogProduct & { savingsPercent: number | null } {
   const f = e.fields;
   return {
     id: e.sys.id,
@@ -34,6 +39,7 @@ function catalog(e: ProductEntry, tier: "everyday" | "member"): CatalogProduct {
       : null,
     price: tier === "member" ? f.priceAuthenticated : f.priceLoggedOut,
     priceTier: tier,
+    savingsPercent: tier === "member" ? 20 : null,
   };
 }
 

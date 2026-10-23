@@ -16,6 +16,14 @@ export function formatPrice(amount: number): string {
   return usd.format(amount);
 }
 
+/**
+ * Member savings pill text: "You save 20%". Formats the whole percent the DAL computed
+ * (savingsPercent, D-036); no arithmetic here.
+ */
+export function formatSavings(percent: number): string {
+  return `You save ${percent}%`;
+}
+
 /** "1 toy", "0 toys", "8 toys". */
 export function formatToyCount(n: number): string {
   return `${n} ${n === 1 ? "toy" : "toys"}`;

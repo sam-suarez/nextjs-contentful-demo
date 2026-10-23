@@ -46,6 +46,7 @@ import {
   LOGIN_NOTE,
   LOGIN_TITLE_TEXT,
   PRICE_AMOUNT_TEXT,
+  PRICE_SAVINGS_ROW,
   PRICE_STACK,
   PRODUCT_CARD_BODY,
   PRODUCT_CARD_FRAME,
@@ -76,12 +77,13 @@ function Line({ text, className = "" }: { text: string; className?: string }) {
   );
 }
 
-/** Two-line price block (label over amount), as in Price. */
+/** Price block as in Price: label over amount, then the empty reserved savings row (D-036). */
 function PriceSkeleton() {
   return (
     <div aria-hidden="true" className={PRICE_STACK}>
       <Line text={LABEL} className="w-28" />
       <Line text={PRICE_AMOUNT_TEXT} className="w-24" />
+      <span aria-hidden="true" className={PRICE_SAVINGS_ROW} />
     </div>
   );
 }

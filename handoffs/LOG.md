@@ -63,3 +63,27 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 04-fix2 | — | human check PASSED (in-thread) | — |
 | — | — | repo cleanup before submission (human, plain session, 2026-10-21): `handoffs/OPEN-ISSUES.md` renamed `handoffs/ESCALATIONS.md` (IDs OI-1/OI-2 kept, decisions written in); `handoffs/VERIFY.md` retired, since every item in it was checked or decided, and replaced by the browser checklist `docs/manual-qa.md`; `handoffs/phase-*/diff.patch` untracked and gitignored (each equals the phase commit's diff, `git show <sha> -- . ':(exclude)handoffs'`) | rows above that name VERIFY.md or OPEN-ISSUES.md refer to those files |
 | — | — | `/ship` replaces `/phase`; architect agent and reviewer docs mode added (D-035, human, plain session, 2026-10-21) | next work starts with `/ship <feature>`; next phase 09 |
+| feature member-savings | A1 r1 | interview round 1 (placement, data, rounding, copy) | cards + detail; DAL computes `savingsPercent`; nearest whole, hidden at 0; copy "You save 20%" (all recommended / requested wording) |
+| feature member-savings | A1 r2 | interview round 2 (position, style, logged-out teaser) | own line under the amount (not recommended: recommended was same row); mint pill; no logged-out teaser |
+| feature member-savings | A1 r3 | interview round 3 (reserved row, specs-first position) | reserve the row in every state (shared constant); specs first: under the amount, right-aligned. `intake.md` written (D-036) |
+| feature member-savings | A2 | Confirm 1 (decisions) | approved |
+| feature member-savings | A3 r1 | architect dispatched | done: architecture.md, design.md, decisions.md (D-036), rules ssr-rendering + client-islands; no Contentful/schema/mock change |
+| feature member-savings | A5 r1 | reviewer (docs mode) dispatched | PASS (I1–I9, DG1–DG7); 4 notes (quaternary token use, D-036 citation placement in architecture.md Tests, `ui-classes.ts` path, "Who builds what" not updated) |
+| feature member-savings | A6 | Confirm 2 (docs diff) | approved as is |
+| feature member-savings | A7 | phases 09 (data-auth), 10 (ui) registered; docs commit | status build |
+| 09 | spec | spec written (R1–R8) | qa pre-build next |
+| 09 | qa pre-build r1 | qa dispatched | tests written (savings 20 new, to-catalog-product, dal); flagged unowned `filter.test.ts` fixture → spec amendments A1 (add to qa paths), A2 (finite inputs only) |
+| 09 | qa pre-build r2 | qa dispatched (A1) | `filter.test.ts` fixture updated; 32 expected failures + savings module missing; ready |
+| 09 | human | shared working tree: session nextjs-contentful-demo-51 edited agents/, .claude/ and added a /ship-minor lane citing D-036, then reverted | continue, guard each step (git status before lock, diff, commit) |
+| 09 | build r1 | data-auth dispatched | savings.ts, types.ts, to-catalog-product.ts; all checks pass per builder; no disputes |
+| 09 | post-build r1 | qa-run dispatched | PASS (typecheck, lint, 454 unit, boundary, build, verify-ssr 495); e2e not run (missing from spec Checks) |
+| 09 | review r1 | reviewer dispatched | PASS (R1–R8, G1–G6) → close |
+| 09 | human check | asked (steps in message only) | not answered: human could not see the steps behind the question dialog → proposed /ship improvement logged; re-asked with steps in the preview |
+| 09 | human check | re-asked with steps in preview | PASSED |
+| 10 | spec | spec written (R1–R12; e2e in Checks) | qa pre-build next |
+| 10 | qa pre-build r1 | qa dispatched | format.test.ts (+4), verify-ssr P10 section (8 expected fails), e2e/savings.spec.ts (18 expected fails); existing e2e 25 pass; gap: no price-card DOM hook (finder used) |
+| 10 | build r1 | ui dispatched | all checks pass except e2e savings.spec.ts R4 row-height test (flaky under pop-in animation); disputed |
+| 10 | post-build r1 (dispute) | qa dispatched | dispute: test changed (settleAnimations before measuring R4; assertions unchanged); all 7 checks PASS (unit 458, verify-ssr 514, e2e 43); re-locked; builder not re-dispatched |
+| 10 | review r1 | reviewer dispatched | PASS (R1–R12, G1–G6) → close |
+| 10 | human check | asked with steps in preview | PASSED |
+| feature member-savings | C1–C2 | pr.md written; STATE pr-open | push + gh pr create next |

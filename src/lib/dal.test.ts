@@ -42,9 +42,14 @@ import type { CatalogProduct } from "@/lib/products/types";
 import { SESSION_COOKIE, signSession, type Session } from "@/lib/session";
 import { productCollectionSchema, type ProductEntry } from "@/schemas/product";
 
+// P09 contract field. The intersection keeps pre-build typecheck clean (CatalogProduct lacks it
+// until the build); post-build it is the same type.
+type CatalogProductWithSavings = CatalogProduct & { savingsPercent: number | null };
+
 // Typed through the spec contract, so a missing module is the only pre-build type error.
 const readSession = (): Promise<Session | null> => verifySession();
-const readProducts = (): Promise<CatalogProduct[]> => getProducts();
+const readProducts = (): Promise<CatalogProductWithSavings[]> =>
+  getProducts() as Promise<CatalogProductWithSavings[]>;
 const readBySlug = (slug: string): Promise<ProductBySlugResult> => getProductBySlug(slug);
 
 const SECRET = "dal-test-secret-0123456789-abcdefghijkl"; // > 32 chars
@@ -61,8 +66,8 @@ const entries = productCollectionSchema
   .parse(mockData)
   .items.sort((a, b) => a.fields.name.localeCompare(b.fields.name, "en"));
 
-/** The CatalogProduct the spec (R7, R8) says a mock entry maps to. */
-function expected(e: ProductEntry, tier: "everyday" | "member"): CatalogProduct {
+/** The CatalogProduct the spec (R7, R8; P09 R4, R5) says a mock entry maps to. */
+function expected(e: ProductEntry, tier: "everyday" | "member"): CatalogProductWithSavings {
   const f = e.fields;
   return {
     id: e.sys.id,
@@ -84,6 +89,8 @@ function expected(e: ProductEntry, tier: "everyday" | "member"): CatalogProduct 
       : null,
     price: tier === "member" ? f.priceAuthenticated : f.priceLoggedOut,
     priceTier: tier,
+    // P09 spec: every mock member price is 0.8 × everyday, so every member-tier product saves 20%.
+    savingsPercent: tier === "member" ? 20 : null,
   };
 }
 
@@ -92,6 +99,18 @@ const EXPECTED_ALL = entries.map((e) => expected(e, "member"));
 const PUBLIC_SLUGS = EXPECTED_PUBLIC.map((p) => p.slug);
 const ALL_SLUGS = EXPECTED_ALL.map((p) => p.slug);
 const entryBySlug = (slug: string) => entries.find((e) => e.fields.slug === slug)!;
+
+const P09_KEYS = [
+  "ageRange", "category", "description", "features", "id", "image", "material", "name",
+  "price", "priceTier", "savingsPercent", "slug", "visibility",
+];
+
+/** savingsPercent of a found getProductBySlug result; throws on any other status. */
+async function slugSavings(slug: string): Promise<number | null> {
+  const result = await readBySlug(slug);
+  if (result.status !== "found") throw new Error(`expected found for ${slug}, got ${result.status}`);
+  return (result.product as CatalogProductWithSavings).savingsPercent;
+}
 
 /** Makes the mocked cookie store return this value for the session cookie (undefined = no cookie). */
 function setSessionCookie(value: string | undefined) {
@@ -395,5 +414,63 @@ describe("dal", () => {
     await readProducts();
     await readBySlug("heirloom-wooden-xylophone");
     expect(mocks.createClient).not.toHaveBeenCalled();
+  });
+
+  // P09: savingsPercent through the DAL
+
+  it("P09 R5: with a valid session, getProducts returns 12 products, each with savingsPercent 20", async () => {
+    await loginAs("ada");
+    const products = await readProducts();
+    expect(products.map((p) => p.slug)).toStrictEqual(ALL_SLUGS);
+    for (const p of products) expect(p.savingsPercent, p.slug).toBe(20);
+  });
+
+  it.each(noSessionCases)(
+    "P09 R5: $label → getProducts returns the 8 public products, each with savingsPercent null",
+    async ({ token }) => {
+      setSessionCookie(await token());
+      const products = await readProducts();
+      expect(products.map((p) => p.slug)).toStrictEqual(PUBLIC_SLUGS);
+      for (const p of products) expect(p.savingsPercent, p.slug).toBeNull();
+    },
+  );
+
+  it("P09 R3: getProducts products have exactly the CatalogProduct keys incl. savingsPercent, with and without a session", async () => {
+    for (const p of await readProducts()) expect(Object.keys(p).sort(), p.slug).toStrictEqual(P09_KEYS);
+    await loginAs("ada");
+    for (const p of await readProducts()) expect(Object.keys(p).sort(), p.slug).toStrictEqual(P09_KEYS);
+  });
+
+  it("P09 R6: logged in, getProductBySlug(cloud-bunny-plush) has savingsPercent 20", async () => {
+    await loginAs("ada");
+    await expect(slugSavings("cloud-bunny-plush")).resolves.toBe(20);
+  });
+
+  it("P09 R6: logged in, getProductBySlug(forest-friends-activity-cube) has savingsPercent 20", async () => {
+    await loginAs("ada");
+    await expect(slugSavings("forest-friends-activity-cube")).resolves.toBe(20);
+  });
+
+  it("P09 R6: logged out, getProductBySlug(cloud-bunny-plush) has savingsPercent null", async () => {
+    await expect(slugSavings("cloud-bunny-plush")).resolves.toBeNull();
+  });
+
+  it("P09 R6: logged in, every slug's savingsPercent matches getProducts for that slug", async () => {
+    await loginAs("ada");
+    const products = await readProducts();
+    expect(products).toHaveLength(12);
+    for (const p of products) {
+      expect(p.savingsPercent, p.slug).toBe(20);
+      await expect(slugSavings(p.slug), p.slug).resolves.toBe(p.savingsPercent);
+    }
+  });
+
+  it("P09 R6: logged out, every public slug's savingsPercent matches getProducts for that slug", async () => {
+    const products = await readProducts();
+    expect(products).toHaveLength(8);
+    for (const p of products) {
+      expect(p.savingsPercent, p.slug).toBeNull();
+      await expect(slugSavings(p.slug), p.slug).resolves.toBe(p.savingsPercent);
+    }
   });
 });

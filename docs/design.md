@@ -97,17 +97,17 @@ Server components in `src/components/` unless marked as an island.
 | **Text link** | `accent-strong`, 700, underline with 2 px offset |
 | **Category chip** | Pill, 2 px `foreground` border, white fill, small category-colour dot before the label. Active chip: `bg-foreground`, white text, `shadow-pop` in its category colour. A `<Link>` (see Filtering) |
 | **Input** | White, 2 px `input-border`, `rounded-lg`, min height 48 px. Focus: border `accent`, `4px 4px 0 0 accent` shadow. A label always sits above it (uppercase label style) |
-| **Badge** | Pill, 2 px `foreground` border, 12.8 px 700. "Members only": `bg-secondary`, `Sparkles` icon. "Member pricing": `bg-tertiary` |
+| **Badge** | Pill, 2 px `foreground` border, 12.8 px 700. "Members only": `bg-secondary`, `Sparkles` icon. "Member pricing": `bg-tertiary`. "You save <n>%" (the savings pill inside Price, D-036): `bg-quaternary` (mint), `foreground` text |
 | **Sticker card** | White, 2 px `foreground` border, `rounded-xl`, sticker shadow, pop-in, hover wiggle. The product name is a stretched link (`after:absolute after:inset-0`) so the whole card is clickable, with one link per card |
 | **Icon circle** | 40 px circle in the category colour with a 2 px `foreground` border and the category icon; sits half over the top edge of the card body (`-mt-5`) |
-| **Price** | Label (uppercase label style) above the amount (Outfit 800, `tabular-nums`). Logged out: label "Everyday price", amount in `foreground`. Logged in: label "Member price" in `accent-strong`, amount in `accent-strong`. Format: `Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })`, always two decimals (`$11.20`, `$9.00`) |
+| **Price** | Label (uppercase label style) above the amount (Outfit 800, `tabular-nums`). Logged out: label "Everyday price", amount in `foreground`. Logged in: label "Member price" in `accent-strong`, amount in `accent-strong`. Format: `Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })`, always two decimals (`$11.20`, `$9.00`). **Savings row** (D-036): its own line directly under the amount (not on the amount row), a fixed height set by one shared constant in `ui-classes.ts` used by both Price and its skeleton. Member tier with a `savingsPercent`: the savings pill (Badge) with the text `You save <n>%`, e.g. `You save 20%`, rendered as one text node. Everyday tier or `savingsPercent: null`, including every signed-out price block: the row is reserved and empty. Price only renders the value from the DAL; it never computes it |
 | **Image frame** | Square, `object-contain`, on a dot-pattern backdrop tinted with the category colour at low opacity. `next/image` with `unoptimized` (architecture.md Error handling) and the product name as `alt` |
 | **Image placeholder** | Same frame size, dashed 2 px `input-border`, `muted` fill, `ImageOff` icon in a white circle, text "Picture coming soon". Used when `image` is absent |
 | **Banner** | Full-width strip under the header, white, bottom border. One sentence plus an optional text link (copy below). The text box keeps a minimum height so the logged-out and logged-in banners are the same height (three lines below about 360 px; accepted after P07, D-031) |
 | **Segmented control** (layout) | Label "Layout"; pill track in `muted`, two options "Price first" / "Specs first"; the active one is white with a 2 px `foreground` border and `shadow-pop`. Exposes `aria-pressed` (island) or `aria-current` (links) |
 | **Empty state** | Centred inside a sticker card: a cluster of three confetti shapes, heading "No toys match your search", body (copy below), secondary button "Clear filters" |
 | **Alert** | 2 px `foreground` border, `bg-secondary/20`, `rounded-lg`, `role="alert"` |
-| **Skeleton** | The `<Suspense>` fallback for content that reads request data (architecture.md Server/client boundary, D-031). Same outer size as the component it replaces at every breakpoint (same container, card frame, grid columns, row heights and min heights), so the swap causes no layout shift. Inside: `muted` blocks with `rounded-md` (pills where the real element is a pill) standing in for text, prices, images and buttons. A gentle pulse animation that is switched off under `prefers-reduced-motion: reduce`. The region carries `aria-busy="true"`; the blocks are `aria-hidden="true"` and contain no text, so no "Loading" copy appears. Server component, CSS only. Used for: the session part of the site header (Sign in button vs badge + name + Sign out), the catalog banner, the catalog filter card and grid (including the count; placeholder cards follow the grid's columns), the product detail body, and the login card (it reads `searchParams` and the session) |
+| **Skeleton** | The `<Suspense>` fallback for content that reads request data (architecture.md Server/client boundary, D-031). Same outer size as the component it replaces at every breakpoint (same container, card frame, grid columns, row heights and min heights), so the swap causes no layout shift. Inside: `muted` blocks with `rounded-md` (pills where the real element is a pill) standing in for text, prices, images and buttons. A gentle pulse animation that is switched off under `prefers-reduced-motion: reduce`. The region carries `aria-busy="true"`; the blocks are `aria-hidden="true"` and contain no text, so no "Loading" copy appears. Price blocks in skeletons reserve the same savings row under the amount, sized by the same `ui-classes.ts` constant as Price (D-036). Server component, CSS only. Used for: the session part of the site header (Sign in button vs badge + name + Sign out), the catalog banner, the catalog filter card and grid (including the count; placeholder cards follow the grid's columns), the product detail body, and the login card (it reads `searchParams` and the session) |
 
 ## Page shell
 
@@ -147,10 +147,16 @@ Price first (default): 1 col, sm 2, lg 3, xl 4
 |      (icon)     |  |      (icon)     |  |      (icon)     |
 | EVERYDAY PRICE  |  | EVERYDAY PRICE  |  | EVERYDAY PRICE  |
 | $28.00          |  | $14.00          |  | $24.00          |
+|                 |  |                 |  |                 |  (reserved savings row, empty signed out)
 | Cloud Bunny ... |  | Bubble Bath ... |  | Rainbow Ring... |
 | Plush           |  | Bath            |  | Stacking & ...  |
 | 0 months+ · Organic cotton, polyester fill                 |
 +-----------------+  +-----------------+  +-----------------+
+
+Price first, signed in (price block only)
+| MEMBER PRICE    |
+| $22.40          |
+| [You save 20%]  |  (mint savings pill under the amount)
 
 Specs first: 1 col, md 2. Card is horizontal from sm
 +-----------------------------------------------------------+
@@ -160,13 +166,14 @@ Specs first: 1 col, md 2. Card is horizontal from sm
 |                    | Material ... Birch plywood, non-toxic |
 |                    | Highlight ......... Bead maze top     |
 |                    | MEMBER PRICE ................ $71.20 |
+|                    |                       [You save 20%] |
 +-----------------------------------------------------------+
 ```
 
 - **Products:** one grid, sorted by name. With a session, members-only products are mixed into the same grid and carry the "Members only" badge plus the pink sticker shadow. The visibility rule is unchanged: without a session the page never receives them (D-014, D-017).
 - **Card content:**
-  - Price first: image, icon circle, price block, name, category label, then `ageRange · material` on one line.
-  - Specs first: image left, then name with badge, category, rows "Age range", "Material" and "Highlight" (`features[0]`, row omitted when there are no features), and the price row last.
+  - Price first: image, icon circle, price block (label, amount, savings row under the amount), name, category label, then `ageRange · material` on one line.
+  - Specs first: image left, then name with badge, category, rows "Age range", "Material" and "Highlight" (`features[0]`, row omitted when there are no features), and the price row last. The savings pill sits on its own line under the amount, right-aligned (D-036).
   - Both card variants are server-rendered in the same card. The grid wrapper's `data-layout` switches columns, card orientation and which spec block is visible with Tailwind `group-data-[layout=specs]:` utilities. The price is rendered **once** per card and moved with `order-*`, not duplicated.
 - **Count:** "8 toys" ("1 toy" when singular), the number of products shown after filtering.
 - **Banner (logged in):** "Member prices are on. You're also seeing 4 members-only toys." (the count of `authenticated` products the DAL returned, before filtering). The logged-out banner deliberately names no count: the logged-out page never receives Set B data, not even its size.
@@ -185,7 +192,8 @@ Catalog / Plush / Cloud Bunny Plush            (breadcrumb, text links)
 |    radius, dot backdrop]  |   +-- price card (sticker) -------------+
 |                           |   | EVERYDAY PRICE                      |
 |                           |   | $28.00                              |
-+---------------------------+   | ----------------------------------  |
++---------------------------+   | (reserved savings row)              |
+                                | ----------------------------------  |
                                 | Members get lower prices on every   |
                                 | toy.        ( Sign in for member pricing )
                                 +-------------------------------------+
@@ -203,7 +211,7 @@ Catalog / Plush / Cloud Bunny Plush            (breadcrumb, text links)
 - Two columns from `lg` (image 7 columns, info 5), stacked below.
 - Breadcrumb category links to `/?category=<value>`.
 - **Logged out:** price card as above. "Sign in for member pricing" is a secondary button linking to `/login?next=/products/<slug>`. The prompt text and the button are always stacked (text above the button), whatever the card width (accepted after P07, D-031).
-- **Logged in:** label "Member price", amount in `accent-strong`, no sign-in row. In the same 80 px area (under the rule) members see a 40 px `quaternary` check circle with "Member price applied" (bold) and "You're signed in, so this price is yours." (`text-sm`, muted), vertically centred, so the card is the same size in both states (D-031; replaces the empty area accepted after P07). A members-only product shows the "Members only" badge next to the h1.
+- **Logged in:** label "Member price", amount in `accent-strong`, the savings pill (`You save 20%`) on its own line under the amount, no sign-in row. Logged out the savings row is reserved and empty, so the row adds the same height in both states (D-036). In the same 80 px area (under the rule) members see a 40 px `quaternary` check circle with "Member price applied" (bold) and "You're signed in, so this price is yours." (`text-sm`, muted), vertically centred, so the card is the same size in both states (D-031; replaces the empty area accepted after P07). A members-only product shows the "Members only" badge next to the h1.
 - The features list is omitted when `features` is absent.
 
 ### Login `/login` (P04)
