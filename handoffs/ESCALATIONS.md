@@ -8,6 +8,7 @@ Problems the agents were not allowed to decide on their own, so the pipeline sto
 |---|---|---|---|---|
 | OI-1 | Signing in from a members-only link landed on the catalog, not the product | qa's e2e test (phase 04, R17) | Proxy answers a real 307 for members-only slugs (D-032); move to `<Suspense>` skeletons (D-031) | `phase-04-fix1` (`5f15cd8`) |
 | OI-2 | After sign-out, the members-only page you just left stayed hidden in the DOM | data-auth + qa during 04-fix1; the human check failed on it | Sign out posts to a `/logout` route handler that answers 303, so the browser does a full page load (D-034) | `phase-04-fix2` (`841459a`) |
+| OI-3 | Phase 12 spec R14 asked that toggling Layout after a client-side sort keeps the sorted order, which contradicts the D-038 known limitation | qa pre-build (phase 12, Open issues 1) | Spec amendment A1: the sentence is dropped; nothing tested about layout after a sort (human, 2026-10-23) | `phase-12` |
 
 ---
 
@@ -41,6 +42,14 @@ Problems the agents were not allowed to decide on their own, so the pipeline sto
 **Cause.** The same `<Activity>` behaviour as OI-1 (`cacheComponents.md`, "Navigation with Activity"). A server-action redirect is a client-side navigation, so the old route stayed mounted.
 
 **Options put to the human.** (1) Accept it. (2) Full page load on sign-out. (3) Refresh the router cache on sign-out (untested). Option 2 was chosen: it is the only one that provably drops the old DOM, and it works without JS.
+
+## OI-3 · Phase 12 R14: layout toggle after a client-side sort
+
+**Found by.** qa, phase 12 pre-build (2026-10-23).
+
+**Conflict.** `handoffs/phase-12/spec.md` R14, last sentence: "After a sort click, toggling Layout keeps the sorted card order." `docs/architecture.md` Filtering and layout (known limitation, D-038 I9): after a client-side sort, a layout toggle writes the `sort` value from the last server render. On `/` that is no `sort`, so with R9 (sort read from `useSearchParams()`) and R11 (`null` sort renders children unchanged) the cards return to name order. The orchestrator's spec contradicted architecture.md; the human chose to accept the limitation at the interview.
+
+**Options put to the human.** (1) Amend R14 to qa's consistent version: on a server-sorted `/?sort=price-asc`, toggling Layout keeps the ascending order (the layout href carries `sort`). (2) Drop the sentence and test nothing about layout after a sort. (3) Change the decision so layout links stay current (reopens I9: architect round, docs review, Confirm 2). Option 2 was chosen (spec amendment A1).
 
 ## Smaller items raised along the way (all resolved)
 

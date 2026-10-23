@@ -9,6 +9,7 @@
 //   - a MutationObserver that records every element with a `data-skeleton` attribute the page
 //     ever puts in the DOM (with its `aria-busy`), so the test knows the skeletons really were
 //     part of the load it measured (Contract: root data-skeleton values, aria-busy="true").
+// P12 R15 (D-038): ROUTES also covers the sorted URL /?sort=price-desc.
 // JavaScript enabled (single "chromium" project). Logged-in state uses a `session` cookie minted
 // with jose and the Playwright webServer SESSION_SECRET (Contract allows this).
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
@@ -28,12 +29,25 @@ type Route = {
   h1: string;
   /** Skeleton roots (Contract `data-skeleton` values) the load must have shown and replaced. */
   skeletons: string[];
+  /**
+   * P12 R15 (D-038): for a sorted URL, the first card's <h2> once loaded, per session state
+   * (handoffs/phase-12/spec.md Contract, Expected data), and the Price control must be visible.
+   * Proves the CLS was measured on the sorted render with the real Price control in place.
+   */
+  sorted?: { loggedOut: string; loggedIn: string };
 };
 
 const ROUTES: Route[] = [
   { path: "/", h1: "Toy catalog", skeletons: ["header-session", "banner", "catalog"] },
   { path: "/?category=bath", h1: "Toy catalog", skeletons: ["header-session", "banner", "catalog"] },
   { path: "/products/cloud-bunny-plush", h1: "Cloud Bunny Plush", skeletons: ["header-session", "product-detail"] },
+  // P12 R15 (D-038): a sorted URL, logged out and in, at both viewports.
+  {
+    path: "/?sort=price-desc",
+    h1: "Toy catalog",
+    skeletons: ["header-session", "banner", "catalog"],
+    sorted: { loggedOut: "Shape Sorter Cube", loggedIn: "Forest Friends Activity Cube" },
+  },
 ];
 
 const STATES = [
@@ -128,6 +142,13 @@ for (const vp of VIEWPORTS) {
 
         // No skeleton left in the visible page once loaded (R10).
         await expect(page.locator('[aria-busy="true"]').filter({ visible: true })).toHaveCount(0);
+
+        // P12 R15: the sorted render, with the real Price control in place of its skeleton.
+        if (route.sorted) {
+          const first = state.loggedIn ? route.sorted.loggedIn : route.sorted.loggedOut;
+          await expect(page.locator("article").filter({ visible: true }).first().locator("h2")).toHaveText(first);
+          await expect(page.locator('[role="group"][aria-labelledby="sort-label"]').filter({ visible: true })).toHaveCount(1);
+        }
 
         await page.waitForLoadState("networkidle");
         await settle(page);

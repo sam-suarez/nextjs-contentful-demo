@@ -49,29 +49,47 @@ export const CATALOG_STACK = "flex flex-col gap-10";
 
 export const FILTER_CARD_FRAME = `${CARD_BASE} sticker flex flex-col gap-5 p-4 md:p-6`;
 
-/** Search form beside the layout control from `md`, stacked below. */
-export const FILTER_TOP_ROW = "flex flex-col gap-5 md:flex-row md:items-end md:justify-between";
+/**
+ * Search form beside the Price and Layout controls from `md` (the controls wrap under the search,
+ * right-aligned, when the row is too narrow for both). Below `md` the row dissolves (`contents`)
+ * so the card stacks search, chips, Price, Layout, then the footer (D-038 I8): the controls and
+ * the footer take `max-md:order-*`.
+ */
+export const FILTER_TOP_ROW = "contents md:flex md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-5";
 
-export const FILTER_SEARCH_COLUMN = "flex flex-1 flex-col gap-2 md:max-w-xl";
+export const FILTER_SEARCH_COLUMN = "flex flex-1 flex-col gap-2 md:max-w-xl md:min-w-72";
+
+/** The right column: Price to the left of Layout from `md`, stacked (after the chips) below. */
+export const FILTER_CONTROLS = "flex flex-col gap-5 max-md:order-1 md:ml-auto md:flex-row md:gap-4";
 
 /** Search input and Search button: stacked below `sm`, one row from `sm`. */
 export const FILTER_SEARCH_ROW = "flex flex-col gap-3 sm:flex-row";
 
 export const SEARCH_INPUT_SIZE = `${CONTROL_HEIGHT} flex-1`;
 
+/** One segmented control: label over track (Layout and Price). */
 export const FILTER_LAYOUT_COLUMN = "flex flex-col gap-2";
 
-/** Segmented layout control track (2 px border, 4 px padding around two 48 px options). */
+/** Segmented control track, Layout and Price (2 px border, 4 px padding around two 48 px options). */
 export const LAYOUT_TRACK = "inline-flex w-fit gap-1 rounded-full border-2 p-1";
 
 export const LAYOUT_OPTION = `inline-flex ${CONTROL_HEIGHT} items-center rounded-full border-2 px-4 text-sm font-bold`;
+
+/**
+ * Fixed width of each Price option ("Low to high", "High to low") and of its skeleton pill, so the
+ * Price track has the same size in the control and the skeleton (D-038 I8).
+ */
+export const SORT_OPTION_WIDTH = "w-28";
+
+/** Price option: LAYOUT_OPTION plus the fixed width, label centred on one line. */
+export const SORT_OPTION_SIZE = `${SORT_OPTION_WIDTH} justify-center whitespace-nowrap`;
 
 export const CHIP_ROW = "flex flex-wrap gap-2";
 
 export const CATEGORY_CHIP = `inline-flex ${CONTROL_HEIGHT} items-center gap-2 rounded-full border-2 border-foreground px-4 text-sm font-bold`;
 
 /** Count and Clear filters, under a rule. */
-export const FILTER_FOOTER_ROW = "flex flex-wrap items-center justify-between gap-3 border-t-2 border-border pt-4";
+export const FILTER_FOOTER_ROW = "flex flex-wrap items-center justify-between gap-3 border-t-2 border-border pt-4 max-md:order-2";
 
 export const COUNT_TEXT = "font-heading text-lg font-bold";
 

@@ -7,6 +7,7 @@
 # Streamed content is part of the response body and counts as present (P07 R11, R12).
 # P04-fix2 additions (D-034): POST /logout route handler (R4-R7) and the sign-out form (R8).
 # P10 additions (D-036): member savings line `You save 20%` (P10 R2, R7, R8).
+# P12 additions (D-038): price sort control (P12 R3-R7, R12, R13, R16).
 #
 # Builds the app (unless VERIFY_SSR_SKIP_BUILD=1), starts `npm start` on
 # VERIFY_SSR_PORT (default 3210) with mock data forced (CONTENTFUL_* exported
@@ -196,6 +197,90 @@ process.stdout.write(m ? m[1].replace(/<[^>]*>/g, "").trim() : "");
 JS
 h1_text() { node "$WORK/h1.mjs" "$@"; }
 h1_text_is() { [ "$(h1_text "$1")" = "$2" ]; }
+
+# P12 (D-038): product card names in DOM order. Prints the text of every <h2>...</h2> whose
+# text (tags and <!-- --> stripped, trimmed) is one of the 12 mock product names, first
+# occurrences only, joined by "|". The flight payload holds no literal "<h2" tags.
+cat >"$WORK/card-names.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [file] = process.argv.slice(2);
+const html = readFileSync(file, "utf8");
+const known = new Set([
+  "Bubble Bath Whale", "Cloud Bunny Plush", "Forest Friends Activity Cube", "Heirloom Wooden Xylophone",
+  "Jingle Ball Trio", "Moonbeam Musical Mobile", "Ocean Wave Rattle", "Rainbow Ring Stacker",
+  "Sensory Crinkle Book Set", "Shape Sorter Cube", "Starlight Teether Ring", "Sunny Duck Bath Squirter",
+]);
+const out = [];
+for (const m of html.matchAll(/<h2(?:\s[^>]*)?>([\s\S]*?)<\/h2>/g)) {
+  const text = m[1].replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "").trim();
+  if (known.has(text) && !out.includes(text)) out.push(text);
+}
+process.stdout.write(out.join("|"));
+JS
+card_names() { node "$WORK/card-names.mjs" "$@"; }
+# card_names_are FILE NAME...: the card <h2> names are exactly these, in this order.
+card_names_are() {
+  local file="$1"
+  shift
+  local IFS='|'
+  [ "$(card_names "$file")" = "$*" ]
+}
+
+# P12 R13 / R12: the serialized island props. The flight payload escapes quotes (\"), so
+# backslashes are removed before the fixed-string search. Usage: payload_has FILE STRING
+cat >"$WORK/payload.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [file, needle] = process.argv.slice(2);
+const body = readFileSync(file, "utf8").replace(/\\/g, "");
+process.exit(body.includes(needle) ? 0 : 1);
+JS
+payload_has() { node "$WORK/payload.mjs" "$@"; }
+
+# P12 R5: the Price control. Prints "label=<p text>|groups=<n>|options=<a texts joined by ,>":
+# label is the raw inner HTML of the element with id="sort-label" when it is a <p> ("-" if
+# none or not a <p>); groups counts elements with role="group" and aria-labelledby="sort-label";
+# options lists the texts of the <a> elements inside the first such group, in order.
+cat >"$WORK/sort-control.mjs" <<'JS'
+import { readFileSync } from "node:fs";
+const [file] = process.argv.slice(2);
+const html = readFileSync(file, "utf8");
+const attrsOf = (s) => {
+  const m = new Map();
+  for (const a of (s ?? "").matchAll(/([^\s"'=<>\/]+)(?:\s*=\s*"([^"]*)")?/g)) m.set(a[1], a[2] ?? "");
+  return m;
+};
+let label = "-";
+const lm = html.match(/<([a-zA-Z][a-zA-Z0-9-]*)(\s[^>]*\sid="sort-label"[^>]*|\s+id="sort-label"[^>]*)>([\s\S]*?)<\/\1>/);
+if (lm && lm[1] === "p") label = lm[3];
+let groups = 0;
+let options = "";
+const openRe = /<([a-zA-Z][a-zA-Z0-9-]*)(\s[^>]*)?>/g;
+for (const m of html.matchAll(openRe)) {
+  const attrs = attrsOf(m[2]);
+  if (attrs.get("role") !== "group" || attrs.get("aria-labelledby") !== "sort-label") continue;
+  groups++;
+  if (groups > 1) continue;
+  // Find the matching close tag of the same name by depth counting.
+  const tag = m[1];
+  const re = new RegExp(`<(/?)${tag}(?:\\s[^>]*)?>`, "g");
+  re.lastIndex = m.index + m[0].length;
+  let depth = 1;
+  let end = html.length;
+  for (let t; (t = re.exec(html)); ) {
+    depth += t[1] === "/" ? -1 : 1;
+    if (depth === 0) { end = t.index; break; }
+  }
+  const inner = html.slice(m.index + m[0].length, end);
+  options = [...inner.matchAll(/<a(?:\s[^>]*)?>([\s\S]*?)<\/a>/g)]
+    .map((a) => a[1].replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "").trim())
+    .join(",");
+}
+process.stdout.write(`label=${label}|groups=${groups}|options=${options}`);
+JS
+sort_control() { node "$WORK/sort-control.mjs" "$@"; }
+sort_control_ok() { [ "$(sort_control "$1")" = "label=Price|groups=1|options=Low to high,High to low" ]; }
+# anchor_href_is FILE TEXT HREF: exactly one <a> with this text, and its href is HREF (escaped form).
+anchor_href_is() { local l; l="$(anchors "$1" "$2")"; [ "${l%%|*}" = "href=$3" ] && [ "$(printf '%s\n' "$l" | wc -l | tr -d '[:space:]')" = "1" ]; }
 
 # fetch_page NAME PATH [COOKIE]: body to $WORK/NAME.html, status to $WORK/NAME.html.status,
 # response headers (for redirect checks, P04 R3/R12) to $WORK/NAME.html.headers.
@@ -390,6 +475,15 @@ fetch_page bath_specs "/?category=bath&layout=specs"
 # P05
 fetch_page bogus "/?layout=bogus"
 fetch_page specs_member "/?layout=specs" "$GOOD_COOKIE"
+# P12 (D-038): price sort
+fetch_page sort_asc "/?sort=price-asc"
+fetch_page sort_desc "/?sort=price-desc"
+fetch_page sort_asc_member "/?sort=price-asc" "$GOOD_COOKIE"
+fetch_page sort_desc_member "/?sort=price-desc" "$GOOD_COOKIE"
+fetch_page sort_bogus "/?sort=bogus"
+fetch_page sort_upper "/?sort=PRICE-ASC"
+fetch_page sort_rattles "/?category=rattles-teethers&sort=price-asc"
+fetch_page sort_combo "/?category=bath&q=duck&layout=specs&sort=price-desc"
 
 # Catalog-only pages, for the R20 "every catalog link keeps state" loop below: the pages
 # fetched after this point (detail, login, not-found) never render the catalog's
@@ -903,6 +997,163 @@ done
 # The signed-out pages above really rendered their prices (so the absence is not an empty page).
 check "P10 R8: / without a session still contains the everyday price \$28.00" has "$(page anon)" '$28.00'
 check "P10 R8: /products/cloud-bunny-plush without a session still contains \$28.00" has "$(page detail_cbp_anon)" '$28.00'
+
+# =====================================================================
+# P12: price sort control (D-038)
+# =====================================================================
+# Expected orders from handoffs/phase-12/spec.md (Contract, "Expected data").
+SORT_ASC_OUT=(
+  "Sunny Duck Bath Squirter" "Starlight Teether Ring" "Ocean Wave Rattle" "Bubble Bath Whale"
+  "Jingle Ball Trio" "Rainbow Ring Stacker" "Cloud Bunny Plush" "Shape Sorter Cube"
+)
+SORT_DESC_OUT=(
+  "Shape Sorter Cube" "Cloud Bunny Plush" "Rainbow Ring Stacker" "Jingle Ball Trio"
+  "Bubble Bath Whale" "Ocean Wave Rattle" "Starlight Teether Ring" "Sunny Duck Bath Squirter"
+)
+SORT_ASC_IN=(
+  "Sunny Duck Bath Squirter" "Starlight Teether Ring" "Ocean Wave Rattle" "Bubble Bath Whale"
+  "Jingle Ball Trio" "Rainbow Ring Stacker" "Cloud Bunny Plush" "Shape Sorter Cube"
+  "Sensory Crinkle Book Set" "Heirloom Wooden Xylophone" "Moonbeam Musical Mobile" "Forest Friends Activity Cube"
+)
+SORT_DESC_IN=(
+  "Forest Friends Activity Cube" "Moonbeam Musical Mobile" "Heirloom Wooden Xylophone" "Sensory Crinkle Book Set"
+  "Shape Sorter Cube" "Cloud Bunny Plush" "Rainbow Ring Stacker" "Jingle Ball Trio"
+  "Bubble Bath Whale" "Ocean Wave Rattle" "Starlight Teether Ring" "Sunny Duck Bath Squirter"
+)
+NAME_ORDER_OUT=("${PUBLIC_NAMES[@]}")
+
+# --- R4: server HTML card order ----------------------------------------------
+check "P12 R4: / (signed out) cards in name order" card_names_are "$(page anon)" "${NAME_ORDER_OUT[@]}"
+check "P12 R4: / (signed in) cards in name order" card_names_are "$(page member)" "${ALL_NAMES_IN_ORDER[@]}"
+check "P12 R4: /?sort=price-asc (signed out) cards in the contract's ascending order" card_names_are "$(page sort_asc)" "${SORT_ASC_OUT[@]}"
+check "P12 R4: /?sort=price-desc (signed out) cards in the exact reverse" card_names_are "$(page sort_desc)" "${SORT_DESC_OUT[@]}"
+check "P12 R4: /?sort=price-asc (signed in) 12 cards in the contract's ascending order" card_names_are "$(page sort_asc_member)" "${SORT_ASC_IN[@]}"
+check "P12 R4: /?sort=price-desc (signed in) 12 cards in the exact reverse" card_names_are "$(page sort_desc_member)" "${SORT_DESC_IN[@]}"
+check "P12 R4: /?sort=bogus cards in name order" card_names_are "$(page sort_bogus)" "${NAME_ORDER_OUT[@]}"
+check "P12 R4: /?sort=PRICE-ASC (case-sensitive) cards in name order" card_names_are "$(page sort_upper)" "${NAME_ORDER_OUT[@]}"
+check "P12 R4: /?category=rattles-teethers&sort=price-asc renders Starlight Teether Ring before Ocean Wave Rattle" \
+  card_names_are "$(page sort_rattles)" "Starlight Teether Ring" "Ocean Wave Rattle"
+
+# --- R3: status and count are unchanged by sort ------------------------------
+P12_COUNTS=(
+  "sort_asc|8 toys"
+  "sort_desc|8 toys"
+  "sort_asc_member|12 toys"
+  "sort_desc_member|12 toys"
+  "sort_bogus|8 toys"
+  "sort_upper|8 toys"
+  "sort_rattles|2 toys"
+  "sort_combo|1 toy"
+)
+for row in "${P12_COUNTS[@]}"; do
+  IFS='|' read -r name count <<<"$row"
+  P="$(page "$name")"
+  check "P12 R3: [$name] status 200" status_is "$P" 200
+  check "P12 R3: [$name] contains '>$count<'" has "$P" ">$count<"
+done
+
+# --- R12 / D-013: sorted pages keep both directions --------------------------
+for name in sort_asc sort_desc; do
+  P="$(page "$name")"
+  for n in "${AUTH_NAMES[@]}"; do check "P12 R12: [$name] signed out lacks authenticated name '$n'" lacks "$P" "$n"; done
+  for p in "${MEMBER_PRICES[@]}"; do check "P12 R12: [$name] signed out lacks member price $p" lacks "$P" "$p"; done
+  for p in "${PUBLIC_EVERYDAY[@]}"; do check "P12 R12: [$name] signed out contains everyday price $p" has "$P" "$p"; done
+  check "P12 R12: [$name] signed out contains no You save" lacks "$P" 'You save'
+done
+for name in sort_asc_member sort_desc_member; do
+  P="$(page "$name")"
+  for n in "${AUTH_NAMES[@]}"; do check "P12 R12: [$name] signed in contains authenticated name '$n'" has "$P" "$n"; done
+  for p in "${MEMBER_PRICES[@]}"; do check "P12 R12: [$name] signed in contains member price $p" has "$P" "$p"; done
+  for p in "${PUBLIC_EVERYDAY[@]}" "${AUTH_EVERYDAY[@]}"; do check "P12 R12: [$name] signed in lacks everyday price $p" lacks "$P" "$p"; done
+done
+
+# --- R13 / R12: the serialized orders prop -----------------------------------
+check "P12 R13: / (signed out) orders prop is {price-asc:[7,6,3,0,2,4,1,5],price-desc:[5,1,4,2,0,3,6,7]}" \
+  payload_has "$(page anon)" '"orders":{"price-asc":[7,6,3,0,2,4,1,5],"price-desc":[5,1,4,2,0,3,6,7]}'
+check "P12 R13: /?sort=price-asc (signed out) orders prop is the identity and its reverse" \
+  payload_has "$(page sort_asc)" '"orders":{"price-asc":[0,1,2,3,4,5,6,7],"price-desc":[7,6,5,4,3,2,1,0]}'
+check "P12 R12: / (signed in) orders prop follows member prices over 12 cards" \
+  payload_has "$(page member)" '"orders":{"price-asc":[11,10,6,0,4,7,1,9,8,3,5,2],"price-desc":[2,5,3,8,9,1,7,4,0,6,10,11]}'
+check "P12 R12: /?sort=price-asc (signed in) orders prop is the identity and its reverse over 12 cards" \
+  payload_has "$(page sort_asc_member)" '"orders":{"price-asc":[0,1,2,3,4,5,6,7,8,9,10,11],"price-desc":[11,10,9,8,7,6,5,4,3,2,1,0]}'
+
+# --- R5 / R6: the Price control in the server HTML -----------------------------
+# NAME | Low to high href | High to low href | active sort (asc / desc / none). Hrefs escaped.
+P12_OPTIONS=(
+  "anon|/?sort=price-asc|/?sort=price-desc|none"
+  "member|/?sort=price-asc|/?sort=price-desc|none"
+  "bath|/?category=bath&amp;sort=price-asc|/?category=bath&amp;sort=price-desc|none"
+  "zzz|/?q=zzz&amp;sort=price-asc|/?q=zzz&amp;sort=price-desc|none"
+  "washable_specs|/?q=washable&amp;layout=specs&amp;sort=price-asc|/?q=washable&amp;layout=specs&amp;sort=price-desc|none"
+  "sort_asc|/?sort=price-asc|/?sort=price-desc|asc"
+  "sort_desc|/?sort=price-asc|/?sort=price-desc|desc"
+  "sort_asc_member|/?sort=price-asc|/?sort=price-desc|asc"
+  "sort_desc_member|/?sort=price-asc|/?sort=price-desc|desc"
+  "sort_bogus|/?sort=price-asc|/?sort=price-desc|none"
+  "sort_upper|/?sort=price-asc|/?sort=price-desc|none"
+  "sort_rattles|/?category=rattles-teethers&amp;sort=price-asc|/?category=rattles-teethers&amp;sort=price-desc|asc"
+  "sort_combo|/?category=bath&amp;q=duck&amp;layout=specs&amp;sort=price-asc|/?category=bath&amp;q=duck&amp;layout=specs&amp;sort=price-desc|desc"
+)
+for row in "${P12_OPTIONS[@]}"; do
+  IFS='|' read -r name asc_href desc_href active <<<"$row"
+  P="$(page "$name")"
+  ac="-"; dc="-"
+  [ "$active" = "asc" ] && ac="true"
+  [ "$active" = "desc" ] && dc="true"
+  check "P12 R5: [$name] <p id=\"sort-label\">Price</p>, one role=group aria-labelledby=sort-label holding Low to high then High to low" \
+    sort_control_ok "$P"
+  check "P12 R5/R6: [$name] one <a>Low to high</a>, href=$asc_href, aria-current=$ac, no aria-pressed, no role" \
+    option_is "$P" "Low to high" "href=$asc_href|aria-current=$ac|aria-pressed=-|role=-"
+  check "P12 R5/R6: [$name] one <a>High to low</a>, href=$desc_href, aria-current=$dc, no aria-pressed, no role" \
+    option_is "$P" "High to low" "href=$desc_href|aria-current=$dc|aria-pressed=-|role=-"
+done
+for name in sort_asc sort_desc sort_asc_member sort_desc_member sort_bogus sort_rattles sort_combo; do
+  P="$(page "$name")"
+  check "P12 R6: [$name] no 'aria-pressed' anywhere in the server HTML" lacks "$P" "aria-pressed"
+  check "P12 R6: [$name] no 'role=\"button\"' anywhere in the server HTML" lacks "$P" 'role="button"'
+done
+
+# --- R7: sort carries over to the other controls -----------------------------
+P="$(page sort_combo)"
+check "P12 R7: [sort_combo] hidden <input> name=\"sort\" value=\"price-desc\"" tag_exists "$P" input 'type=hidden' 'name=sort' 'value=price-desc'
+check "P12 R7: [sort_combo] hidden <input> name=\"category\" value=\"bath\" still present" tag_exists "$P" input 'type=hidden' 'name=category' 'value=bath'
+check "P12 R7: [sort_combo] hidden <input> name=\"layout\" value=\"specs\" still present" tag_exists "$P" input 'type=hidden' 'name=layout' 'value=specs'
+check "P12 R7: [sort_combo] Plush chip href is /?category=plush&q=duck&layout=specs&sort=price-desc" \
+  anchor_href_is "$P" "Plush" "/?category=plush&amp;q=duck&amp;layout=specs&amp;sort=price-desc"
+check "P12 R7: [sort_combo] All chip href keeps q, layout and sort" \
+  anchor_href_is "$P" "All" "/?q=duck&amp;layout=specs&amp;sort=price-desc"
+P12_CHIPS=(
+  "Rattles &amp; Teethers|rattles-teethers"
+  "Stacking &amp; Sorting|stacking-sorting"
+  "Bath|bath"
+  "Activity &amp; Sensory|activity-sensory"
+  "Musical|musical"
+)
+for row in "${P12_CHIPS[@]}"; do
+  IFS='|' read -r text slug <<<"$row"
+  check "P12 R7: [sort_combo] '$text' chip href keeps q, layout and sort" \
+    anchor_href_is "$P" "$text" "/?category=$slug&amp;q=duck&amp;layout=specs&amp;sort=price-desc"
+done
+check "P12 R7: [sort_combo] Price first href keeps category, q and sort" \
+  option_is "$P" "Price first" "href=/?category=bath&amp;q=duck&amp;sort=price-desc|aria-current=-|aria-pressed=-|role=-"
+check "P12 R7: [sort_combo] Specs first href keeps category, q and sort" \
+  option_is "$P" "Specs first" "href=/?category=bath&amp;q=duck&amp;layout=specs&amp;sort=price-desc|aria-current=true|aria-pressed=-|role=-"
+check "P12 R7: [sort_combo] Clear filters href is /" anchor_href_is "$P" "Clear filters" "/"
+
+P="$(page sort_asc)"
+check "P12 R7: [sort_asc] hidden <input> name=\"sort\" value=\"price-asc\"" tag_exists "$P" input 'type=hidden' 'name=sort' 'value=price-asc'
+check "P12 R7: [sort_asc] Bath chip href is /?category=bath&sort=price-asc" anchor_href_is "$P" "Bath" "/?category=bath&amp;sort=price-asc"
+check "P12 R7: [sort_asc] All chip href is /?sort=price-asc" anchor_href_is "$P" "All" "/?sort=price-asc"
+check "P12 R7: [sort_asc] Price first href is /?sort=price-asc (active)" \
+  option_is "$P" "Price first" "href=/?sort=price-asc|aria-current=true|aria-pressed=-|role=-"
+check "P12 R7: [sort_asc] Specs first href is /?layout=specs&sort=price-asc" \
+  option_is "$P" "Specs first" "href=/?layout=specs&amp;sort=price-asc|aria-current=-|aria-pressed=-|role=-"
+check "P12 R7: [sort_asc] Clear filters href is /" anchor_href_is "$P" "Clear filters" "/"
+
+for name in anon member washable_specs bath_specs sort_bogus sort_upper; do
+  check "P12 R7: [$name] no <input> with name=\"sort\" when sort is not set" no_tag "$(page "$name")" input 'name=sort'
+done
+check "P12 R7: [sort_bogus] All chip href has no sort" anchor_href_is "$(page sort_bogus)" "All" "/"
 
 # --- Summary ----------------------------------------------------------------
 echo

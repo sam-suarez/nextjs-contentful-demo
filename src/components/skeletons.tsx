@@ -29,6 +29,7 @@ import {
   FEATURE_ITEM,
   FEATURE_LIST,
   FILTER_CARD_FRAME,
+  FILTER_CONTROLS,
   FILTER_FOOTER_ROW,
   FILTER_LAYOUT_COLUMN,
   FILTER_SEARCH_COLUMN,
@@ -56,6 +57,7 @@ import {
   PRODUCT_NAME_TEXT,
   SEARCH_INPUT_SIZE,
   SECTION_HEADING,
+  SORT_OPTION_WIDTH,
 } from "@/components/ui-classes";
 
 /** A pulsing muted fill (pulse in globals.css, off under prefers-reduced-motion). */
@@ -135,7 +137,7 @@ function CardSkeleton() {
   );
 }
 
-/** Filter card (search, layout control, chips, count + Clear filters) and the product grid. */
+/** Filter card (search, Price and Layout controls, chips, count + Clear filters) and the product grid. */
 export function CatalogSkeleton() {
   return (
     <div data-skeleton="catalog" aria-busy="true" className={CATALOG_STACK}>
@@ -148,11 +150,21 @@ export function CatalogSkeleton() {
               <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-full sm:w-32`} />
             </div>
           </div>
-          <div aria-hidden="true" className={FILTER_LAYOUT_COLUMN}>
-            <Line text={LABEL} className="w-16" />
-            <div aria-hidden="true" className={`${LAYOUT_TRACK} border-transparent bg-muted`}>
-              <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-28`} />
-              <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-28`} />
+          <div aria-hidden="true" className={FILTER_CONTROLS}>
+            {/* Price (D-038): label, then a track holding two fixed-width options. */}
+            <div aria-hidden="true" className={FILTER_LAYOUT_COLUMN}>
+              <Line text={LABEL} className="w-12" />
+              <div aria-hidden="true" className={`${LAYOUT_TRACK} border-transparent bg-muted`}>
+                <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} ${SORT_OPTION_WIDTH}`} />
+                <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} ${SORT_OPTION_WIDTH}`} />
+              </div>
+            </div>
+            <div aria-hidden="true" className={FILTER_LAYOUT_COLUMN}>
+              <Line text={LABEL} className="w-16" />
+              <div aria-hidden="true" className={`${LAYOUT_TRACK} border-transparent bg-muted`}>
+                <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-28`} />
+                <span aria-hidden="true" className={`${PILL} ${CONTROL_HEIGHT} w-28`} />
+              </div>
             </div>
           </div>
         </div>

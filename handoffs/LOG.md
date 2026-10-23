@@ -105,3 +105,14 @@ Append-only, owned by the orchestrator. Written after every dispatch; never read
 | 11 | lock check r1 | shasum + list | unchanged |
 | 11 | review r1 | reviewer dispatched | PASS (R1–R10, G1–G6) |
 | 11 | post-build r1 | qa-run dispatched | PASS (7 checks: unit 496, verify-ssr 514, e2e 43) → close |
+| 11 | human check | asked with steps in preview | PASSED |
+| 12 | spec | spec.md written (R1–R17) | qa pre-build next |
+| 12 | pre-build | qa dispatched | tests written (unit, verify-ssr P12 section, e2e price-sort + CLS sorted URL); all new fail on missing feature; Open issue: R14 last sentence contradicts D-038 limitation |
+| 12 | escalation | OI-3 opened | asking the human |
+| 12 | OI-3 | human answer | drop R14 last sentence (not recommended: qa version) → amendment A1; qa dispute mode to remove the test |
+| 12 | dispute (A1) | qa dispatched | removed the R14 layout-after-sort test + unused SPECS_FIRST; nothing else |
+| 12 | lock | tests.list + tests.sha written | build round 1 next |
+| 12 | build r1 | ui dispatched | all checks pass except e2e price-sort.spec.ts:384 (Ctrl+click on macOS Chromium fires contextmenu, no click); disputed |
+| 12 | lock check r1 | shasum + list | unchanged |
+| 12 | post-build r1 (dispute) | qa dispatched | dispute: test changed (Ctrl+click expects contextmenu on darwin, click elsewhere; assertions unchanged); all 7 checks PASS (unit 515, verify-ssr 744, e2e 65); only price-sort.spec.ts differs; re-locked; builder not re-dispatched |
+| 12 | review r1 | reviewer dispatched | PASS (R1–R17, G1–G6) → close; 3 layout notes for the human check |
